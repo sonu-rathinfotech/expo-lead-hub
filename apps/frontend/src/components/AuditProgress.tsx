@@ -63,7 +63,7 @@ export function AuditProgress({
 
   const messages = [
     `Capturing ${host(yourUrl)}…`,
-    competitorUrl ? `Capturing ${host(competitorUrl)}…` : "Capturing competitors…",
+    competitorUrl ? `Capturing ${host(competitorUrl)}…` : "Capturing partners…",
     "Measuring domain authority & backlinks…",
     "Analyzing your ranking keywords…",
     "Checking speed & Core Web Vitals…",
@@ -96,7 +96,7 @@ export function AuditProgress({
   useEffect(() => {
     if (muted) return;
     const name = company?.trim() ? company.trim() : "there";
-    const comp = competitorUrl ? host(competitorUrl) : "your competitor";
+    const comp = competitorUrl ? host(competitorUrl) : "your partner";
     const segments = [
       { at: 0, text: `Hey ${name}! Let's see how you stack up against ${comp}. Starting your audit now.` },
       { at: 17000, text: "Still analyzing — measuring your S E O, page speed and design." },
@@ -243,7 +243,7 @@ export function AuditProgress({
           </span>
         </div>
 
-        <BattleDevice url={competitorUrl} label="Competitor" tone="comp" attack="attackComp" />
+        <BattleDevice url={competitorUrl} label="Partner" tone="comp" attack="attackComp" />
       </div>
 
       <h2 className="text-2xl font-black tracking-tight sm:text-3xl">

@@ -247,11 +247,11 @@ export function ScoreReport({ data }: { data: Comparison }) {
   const radarAxes = ["UI", "UX", "SEO", "Conv", "AI"];
   const radarSeries = [
     { label: hostOf(data.url) || "You", color: YOU_COLOR, values: [your.ui ?? 0, your.ux ?? 0, your.seo ?? 0, your.conversion ?? 0, your.llmScore ?? 0] },
-    { label: hostOf(data.competitorUrl) || "Competitor", color: COMP_COLOR, values: [comp.ui ?? 0, comp.ux ?? 0, comp.seo ?? 0, comp.conversion ?? 0, comp.llmScore ?? 0] },
+    { label: hostOf(data.competitorUrl) || "Partner", color: COMP_COLOR, values: [comp.ui ?? 0, comp.ux ?? 0, comp.seo ?? 0, comp.conversion ?? 0, comp.llmScore ?? 0] },
   ];
   if (comp2)
     radarSeries.push({
-      label: hostOf(data.competitorUrl2) || "Competitor 2",
+      label: hostOf(data.competitorUrl2) || "Partner 2",
       color: COMP2_COLOR,
       values: [comp2.ui ?? 0, comp2.ux ?? 0, comp2.seo ?? 0, comp2.conversion ?? 0, comp2.llmScore ?? 0],
     });
@@ -288,7 +288,7 @@ export function ScoreReport({ data }: { data: Comparison }) {
           {youWin ? "Your site leads" : tie ? "It's a close call" : "How your site compares"}
         </h2>
         <p className="mx-auto mt-0.5 text-xs font-medium uppercase tracking-wide text-white/70">
-          {who} vs {hostOf(data.competitorUrl) || "competitor"}
+          {who} vs {hostOf(data.competitorUrl) || "partner"}
         </p>
         <p className="mx-auto mt-1.5 max-w-2xl text-sm leading-relaxed text-white/80">{verdict.reasoning}</p>
       </div>
@@ -297,11 +297,11 @@ export function ScoreReport({ data }: { data: Comparison }) {
       <div className="flex flex-col items-stretch gap-4 sm:flex-row">
         <BigScore label={data.company || hostOf(data.url) || "Your site"} value={your.overallScore ?? 0} highlight={youWin} />
         <div className="flex items-center justify-center px-2 text-lg font-black text-gray-400">VS</div>
-        <BigScore label={hostOf(data.competitorUrl) || "Competitor"} value={comp.overallScore ?? 0} highlight={verdict.winner === "competitor"} />
+        <BigScore label={hostOf(data.competitorUrl) || "Partner"} value={comp.overallScore ?? 0} highlight={verdict.winner === "competitor"} />
         {comp2 && (
           <>
             <div className="flex items-center justify-center px-2 text-lg font-black text-gray-400">VS</div>
-            <BigScore label={hostOf(data.competitorUrl2) || "Competitor 2"} value={comp2.overallScore ?? 0} highlight={verdict.winner === "competitor2"} />
+            <BigScore label={hostOf(data.competitorUrl2) || "Partner 2"} value={comp2.overallScore ?? 0} highlight={verdict.winner === "competitor2"} />
           </>
         )}
       </div>
@@ -332,7 +332,7 @@ export function ScoreReport({ data }: { data: Comparison }) {
         {/* Category comparison */}
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <div className="mb-4 grid grid-cols-[1fr_auto_1fr] text-xs font-semibold uppercase tracking-wide text-gray-400">
-            <span className="text-right">You</span><span className="w-24 text-center">Metric</span><span>Competitor</span>
+            <span className="text-right">You</span><span className="w-24 text-center">Metric</span><span>Partner</span>
           </div>
           <div className="space-y-3">
             <Bar label="UI" you={your.ui} comp={comp.ui} />
@@ -358,8 +358,8 @@ export function ScoreReport({ data }: { data: Comparison }) {
           <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-500">Domain authority &amp; keywords</h3>
           <div className={`grid gap-4 ${comp2 ? "grid-cols-3" : "grid-cols-2"}`}>
             <MetricsCol title={data.company || hostOf(data.url) || "Your site"} m={myMetrics} accent="text-emerald-600" />
-            <MetricsCol title={hostOf(data.competitorUrl) || "Competitor"} m={compMetrics} accent="text-rose-600" />
-            {comp2 && <MetricsCol title={hostOf(data.competitorUrl2) || "Competitor 2"} m={comp2Metrics} accent="text-rose-600" />}
+            <MetricsCol title={hostOf(data.competitorUrl) || "Partner"} m={compMetrics} accent="text-rose-600" />
+            {comp2 && <MetricsCol title={hostOf(data.competitorUrl2) || "Partner 2"} m={comp2Metrics} accent="text-rose-600" />}
           </div>
           <p className="mt-3 text-center text-xs text-gray-400">DA / PA are DataForSEO domain &amp; page ranks (0–1000). Keywords &amp; traffic are organic estimates.</p>
         </div>
@@ -383,8 +383,8 @@ export function ScoreReport({ data }: { data: Comparison }) {
       {/* Summaries + screenshots */}
       <div className={`grid grid-cols-1 gap-4 ${comp2 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
         <SiteCard title={data.company || "Your site"} url={data.url} shot={data.mobileShot || data.desktopShot} summary={your.summary} tone="emerald" />
-        <SiteCard title="Competitor" url={data.competitorUrl} shot={data.competitorShot} summary={comp.summary} tone="rose" />
-        {comp2 && <SiteCard title="Competitor 2" url={data.competitorUrl2} shot={data.competitor2Shot} summary={comp2.summary} tone="rose" />}
+        <SiteCard title="Partner" url={data.competitorUrl} shot={data.competitorShot} summary={comp.summary} tone="rose" />
+        {comp2 && <SiteCard title="Partner 2" url={data.competitorUrl2} shot={data.competitor2Shot} summary={comp2.summary} tone="rose" />}
       </div>
 
       {/* Suggestions to win */}

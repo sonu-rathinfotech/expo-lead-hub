@@ -67,7 +67,7 @@ export function BoothLanding() {
           </div>
           <h2 className="text-2xl font-bold">AI Score Game</h2>
           <p className="text-white/60">
-            Your website vs a competitor — get an instant head-to-head score and how to win.
+            Your website vs a partner — get an instant head-to-head score and how to win.
           </p>
           <span className="mt-auto inline-flex items-center gap-1.5 font-semibold text-indigo-300 group-hover:gap-2.5">
             Play <ArrowRight size={18} />

@@ -116,7 +116,7 @@ export function ScoreGamePage() {
     <div className="space-y-6">
       <div>
         <h2 className="flex items-center gap-2 text-2xl font-bold text-gray-900"><Gamepad2 className="text-indigo-600" /> AI Score Game</h2>
-        <p className="mt-1 text-sm text-gray-500">Look up the visitor, enter their site and a competitor's — get a head-to-head score.</p>
+        <p className="mt-1 text-sm text-gray-500">Look up the visitor, enter their site and a partner's — get a head-to-head score.</p>
       </div>
 
       {!analysis && (

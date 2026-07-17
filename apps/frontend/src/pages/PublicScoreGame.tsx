@@ -147,7 +147,7 @@ export function PublicScoreGame() {
           <h1 className="text-2xl font-bold tracking-tight">AI Website Score</h1>
           <p className="mx-auto mt-2 max-w-sm text-sm text-slate-400">
             {session.data?.visitor.name ? `${session.data.visitor.name}, see ` : "See "}
-            how your site stacks up against a competitor — in under 90 seconds.
+            how your site stacks up against a partner — in under 90 seconds.
           </p>
           {(session.data?.visitor.email || session.data?.visitor.phone) && (
             <div className="mt-3 inline-flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300">
@@ -191,12 +191,12 @@ export function PublicScoreGame() {
             <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="yourcompany.com" className={input} />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-300">Competitor website</label>
+            <label className="mb-1.5 block text-sm font-medium text-slate-300">Partner website</label>
             <input value={competitorUrl} onChange={(e) => setCompetitorUrl(e.target.value)} placeholder="competitor.com" className={input} />
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-300">
-              2nd competitor <span className="font-normal text-slate-500">(optional)</span>
+              2nd partner <span className="font-normal text-slate-500">(optional)</span>
             </label>
             <input value={competitorUrl2} onChange={(e) => setCompetitorUrl2(e.target.value)} placeholder="another-competitor.com" className={input} />
           </div>

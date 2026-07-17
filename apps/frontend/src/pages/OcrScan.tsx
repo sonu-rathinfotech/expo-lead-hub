@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Camera, ScanLine, Loader2, CheckCircle2, RotateCcw, Gamepad2 } from "lucide-react";
+import { Camera, ScanLine, Loader2, CheckCircle2, RotateCcw, Gamepad2, Search } from "lucide-react";
 import toast from "react-hot-toast";
-import { api } from "../lib/api-client";
+import { api, publicApi } from "../lib/api-client";
 import { downscale } from "../lib/ocr";
 import { useAuthStore } from "../stores/auth.store";
 import { DynamicForm, type FormFieldDef } from "../components/DynamicForm";
@@ -36,6 +36,22 @@ function injectOcr(fields: FormFieldDef[], parsed: ParsedData): FormFieldDef[] {
   });
 }
 
+// Prefill form fields from a matched BNI member (same key-matching as OCR).
+function injectBni(fields: FormFieldDef[], m: any): FormFieldDef[] {
+  return fields.map((f) => {
+    const k = f.fieldKey.toLowerCase();
+    let v: string | undefined;
+    if (/company|organi/.test(k)) v = m.company;
+    else if (/chapter/.test(k)) v = m.chapter;
+    else if (/region/.test(k)) v = m.region;
+    else if (/contact|person|full.?name|^name$/.test(k)) v = m.name;
+    else if (/email/.test(k)) v = m.email;
+    else if (/mobile|phone/.test(k)) v = m.phone;
+    else if (/website|url|web/.test(k)) v = m.website;
+    return v ? { ...f, defaultValue: v } : f;
+  });
+}
+
 // Basic contact fields used for manual entry when an event's form has none.
 const DEFAULT_MANUAL_FIELDS: FormFieldDef[] = [
   { id: "m_name", fieldKey: "contact_person", fieldType: "TEXT", label: "Name", isRequired: true },
@@ -44,6 +60,31 @@ const DEFAULT_MANUAL_FIELDS: FormFieldDef[] = [
   { id: "m_phone", fieldKey: "mobile_number", fieldType: "PHONE", label: "Mobile", isRequired: false },
   { id: "m_designation", fieldKey: "designation", fieldType: "TEXT", label: "Designation", isRequired: false },
 ];
+
+// Extra fields appended to every capture form.
+const CATEGORY_FIELD: FormFieldDef = {
+  id: "m_category",
+  fieldKey: "category",
+  fieldType: "TEXT",
+  label: "Category",
+  isRequired: false,
+  placeholder: "e.g. IT, Finance, Real Estate",
+} as FormFieldDef;
+const CHAPTER_FIELD: FormFieldDef = {
+  id: "m_chapter",
+  fieldKey: "bni_chapter",
+  fieldType: "TEXT",
+  label: "BNI Chapter",
+  isRequired: false,
+} as FormFieldDef;
+const NOTES_FIELD: FormFieldDef = {
+  id: "m_notes",
+  fieldKey: "notes",
+  fieldType: "TEXTAREA",
+  label: "Notes",
+  isRequired: false,
+  placeholder: "Notes about this lead (optional)",
+} as FormFieldDef;
 
 export function OcrScanPage() {
   const user = useAuthStore((s) => s.user);
@@ -62,6 +103,13 @@ export function OcrScanPage() {
   const [scanning, setScanning] = useState(false);
   const [playToken, setPlayToken] = useState<string | null>(null);
   const [manual, setManual] = useState(startManual); // staff typing the lead by hand (no scan)
+  // BNI quick-lookup (by name / email / mobile) to prefill the form.
+  const [bniQuery, setBniQuery] = useState("");
+  const [bniBusy, setBniBusy] = useState(false);
+  const [bniMsg, setBniMsg] = useState<{ tone: "ok" | "warn"; text: string } | null>(null);
+  const [bniMatch, setBniMatch] = useState<any | null>(null);
+  const [bniResults, setBniResults] = useState<any[]>([]);
+  const [bniNonce, setBniNonce] = useState(0);
 
   const { data: eventsData } = useQuery({
     queryKey: ["events-filter"],
@@ -166,24 +214,135 @@ export function OcrScanPage() {
     setDone(false);
     setPlayToken(null);
     setManual(false);
+    setBniQuery("");
+    setBniMatch(null);
+    setBniResults([]);
+    setBniMsg(null);
   };
 
-  // The lead form (OCR-prefilled when a card was scanned, else the manual form).
-  // Opens the game in a new tab on submit; the capture tab stays for the next visitor.
+  // Look up BNI members by name / email / mobile — show matches as suggestions.
+  const lookupBni = async () => {
+    const q = bniQuery.trim();
+    if (q.length < 2) {
+      setBniMsg({ tone: "warn", text: "Enter a name, email or mobile number." });
+      return;
+    }
+    setBniBusy(true);
+    setBniResults([]);
+    try {
+      const { data } = await publicApi.bniLookup(q);
+      const members: any[] = data?.members ?? [];
+      if (members.length === 1) {
+        pickBni(members[0]);
+      } else if (members.length > 1) {
+        setBniResults(members);
+        setBniMsg({ tone: "ok", text: `${members.length} matches — pick the right one below.` });
+      } else {
+        setBniMsg({ tone: "warn", text: "No match — please type the details in below." });
+      }
+    } catch {
+      setBniMsg({ tone: "warn", text: "Lookup failed — please type the details in below." });
+    } finally {
+      setBniBusy(false);
+    }
+  };
+
+  // Live typeahead — show name suggestions as the mobile/name is typed.
+  useEffect(() => {
+    const q = bniQuery.trim();
+    if (q.length < 3) {
+      setBniResults([]);
+      return;
+    }
+    let cancelled = false;
+    const id = setTimeout(async () => {
+      setBniBusy(true);
+      try {
+        const { data } = await publicApi.bniLookup(q);
+        if (!cancelled) {
+          setBniResults(data?.members ?? []);
+          setBniMsg(null);
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) setBniBusy(false);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(id);
+    };
+  }, [bniQuery]);
+
+  // Apply a chosen member: prefill the form (name, company, chapter, etc.).
+  const pickBni = (m: any) => {
+    setBniMatch(m);
+    setBniResults([]);
+    setBniNonce((k) => k + 1); // remount the form with the prefilled values
+    setManual(true); // reveal the form even without a scan
+    setBniMsg({ tone: "ok", text: `Selected ${m.name}${m.company ? ` · ${m.company}` : ""} — details filled in below.` });
+  };
+
+  const bniSearchBox = (
+    <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
+      <p className="mb-2 text-sm font-semibold text-indigo-900">BNI member? Search to auto-fill</p>
+      <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-white px-3">
+        <Search size={15} className="text-indigo-400" />
+        <input
+          value={bniQuery}
+          onChange={(e) => setBniQuery(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && lookupBni()}
+          placeholder="Type mobile number…"
+          className="w-full bg-transparent py-2 text-sm focus:outline-none"
+        />
+        <button
+          onClick={lookupBni}
+          disabled={bniBusy}
+          className="shrink-0 rounded-md bg-indigo-600 px-3 py-1 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {bniBusy ? <Loader2 size={13} className="animate-spin" /> : <Search size={13} />}
+        </button>
+      </div>
+      {bniMsg && (
+        <p className={`mt-2 text-xs ${bniMsg.tone === "ok" ? "text-emerald-600" : "text-amber-600"}`}>{bniMsg.text}</p>
+      )}
+      {/* Name suggestions — pick the right member */}
+      {bniResults.length > 0 && (
+        <div className="mt-2 divide-y divide-indigo-100 overflow-hidden rounded-lg border border-indigo-200 bg-white">
+          {bniResults.map((m) => (
+            <button
+              key={m.id ?? `${m.name}-${m.phone}`}
+              onClick={() => pickBni(m)}
+              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-indigo-50"
+            >
+              <span>
+                <span className="font-medium text-gray-900">{m.name}</span>
+                {m.company && <span className="text-gray-500"> · {m.company}</span>}
+                {m.chapter && <span className="block text-xs text-gray-400">{m.chapter}</span>}
+              </span>
+              {m.phone && <span className="shrink-0 text-xs text-gray-400">{m.phone}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  // The lead form. Category / BNI Chapter / Notes are appended, then BNI + OCR
+  // values are injected across the whole set (so Chapter gets prefilled too).
   const renderLeadForm = () => {
-    const formFields = scan
-      ? injectOcr(activeFields, scan.parsed)
-      : activeFields.length
-        ? activeFields
-        : form
-          ? DEFAULT_MANUAL_FIELDS
-          : [];
-    if (formFields.length === 0) {
+    const base: FormFieldDef[] = activeFields.length ? activeFields : form ? DEFAULT_MANUAL_FIELDS : [];
+    if (base.length === 0) {
       return <p className="py-10 text-center text-sm text-amber-600">This event has no form configured.</p>;
     }
+    const extras = [CATEGORY_FIELD, CHAPTER_FIELD, NOTES_FIELD].filter((x) => !base.some((f) => f.fieldKey === x.fieldKey));
+    let formFields = [...base, ...extras];
+    if (bniMatch) formFields = injectBni(formFields, bniMatch);
+    if (scan) formFields = injectOcr(formFields, scan.parsed);
     return (
       <DynamicForm
-        key={scan ? scanKey : "manual"}
+        key={`${scan ? scanKey : "manual"}-${bniNonce}`}
         fields={formFields}
         submitting={submitMutation.isPending}
         onSubmit={(values) => {
@@ -252,13 +411,18 @@ export function OcrScanPage() {
       {!ready ? (
         <p className="text-sm text-gray-400">Select an event, booth, and visitor type to begin.</p>
       ) : startManual ? (
-        // Manual Form — just the form, no card-scan UI.
-        <div className="max-w-2xl rounded-lg border border-gray-200 bg-white p-5">
-          <h3 className="mb-3 font-semibold text-gray-900">Enter lead details</h3>
-          {renderLeadForm()}
+        // Manual Form — BNI search + just the form, no card-scan UI.
+        <div className="mx-auto max-w-2xl space-y-4">
+          {bniSearchBox}
+          <div className="rounded-lg border border-gray-200 bg-white p-5">
+            <h3 className="mb-3 font-semibold text-gray-900">Enter lead details</h3>
+            {renderLeadForm()}
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <div className="space-y-5">
+          {bniSearchBox}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {/* Capture */}
           <div className="rounded-lg border border-gray-200 bg-white p-5">
             <h3 className="mb-3 font-semibold text-gray-900">1 · Capture card</h3>
@@ -332,6 +496,7 @@ export function OcrScanPage() {
             ) : (
               renderLeadForm()
             )}
+          </div>
           </div>
         </div>
       )}

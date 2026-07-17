@@ -256,12 +256,14 @@ function renderField(
       );
 
     default: {
-      // TEXT, EMAIL, PHONE, URL
-      const type =
-        fieldType === "EMAIL" ? "email" : fieldType === "PHONE" ? "tel" : fieldType === "URL" ? "url" : "text";
+      // TEXT, EMAIL, PHONE, URL. URL stays a plain text input (with a URL-friendly
+      // mobile keyboard) — the browser's strict type="url" rejects bare domains
+      // like "company.com", but the server adds https:// for us.
+      const type = fieldType === "EMAIL" ? "email" : fieldType === "PHONE" ? "tel" : "text";
       return (
         <input
           type={type}
+          inputMode={fieldType === "URL" ? "url" : undefined}
           value={strVal}
           placeholder={placeholder ?? ""}
           onChange={(e) => setValue(fieldKey, e.target.value)}

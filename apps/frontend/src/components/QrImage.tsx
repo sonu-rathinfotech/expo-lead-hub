@@ -46,7 +46,8 @@ export async function printQr(value: string, title: string) {
     <body>
       <h2>${title}</h2>
       <img src="${dataUrl}" />
-      <p>${value}</p>
+      <p><strong>Scan the QR</strong>, or on a computer visit:</p>
+      <p style="color:#4f46e5">${value}</p>
       <script>window.onload = () => { window.print(); }</script>
     </body></html>`);
   win.document.close();

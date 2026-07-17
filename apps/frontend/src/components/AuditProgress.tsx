@@ -34,6 +34,17 @@ function pickVoice(): SpeechSynthesisVoice | null {
   return vs.find((x) => /^en/i.test(x.lang)) ?? vs[0] ?? null;
 }
 
+// Attack words the two sites fire at each other. 3 lanes per side are visible
+// at a time; a rotating "volley" cycles through the whole pool for variety.
+const RIGHT_WORDS = [
+  "SEO", "SPEED", "UX", "MOBILE", "CTA", "SCHEMA", "H1 TAGS", "META", "HTTPS", "SITEMAP",
+  "CANONICAL", "LCP", "ALT TAGS", "PAGESPEED", "INDEXING", "CONTENT", "INTERNAL LINKS", "RICH SNIPPETS", "CORE VITALS", "A11Y",
+];
+const LEFT_WORDS = [
+  "BACKLINKS", "DESIGN", "KEYWORDS", "DOMAIN RANK", "TRAFFIC", "RANKING", "AUTHORITY", "CONVERSION", "BOUNCE RATE", "DWELL TIME",
+  "CRAWL", "OG TAGS", "CDN", "CACHE", "REDIRECTS", "404 FIXES", "ANCHOR TEXT", "SERP", "ROBOTS.TXT", "AMP",
+];
+
 // Full-screen, video-like "audit in progress" scene with live voice narration.
 export function AuditProgress({
   company,
@@ -47,6 +58,7 @@ export function AuditProgress({
   queuePosition?: number;
 }) {
   const [tick, setTick] = useState(0);
+  const [volley, setVolley] = useState(0); // rotates the attack words
   const [muted, setMuted] = useState(false);
 
   const messages = [
@@ -68,7 +80,11 @@ export function AuditProgress({
   // that the tail lines cycle until the report arrives (component unmounts).
   useEffect(() => {
     const t = setInterval(() => setTick((n) => n + 1), 6000);
-    return () => clearInterval(t);
+    const v = setInterval(() => setVolley((n) => n + 1), 3000);
+    return () => {
+      clearInterval(t);
+      clearInterval(v);
+    };
   }, []);
 
   const step = Math.min(tick, messages.length - 1); // timeline position (holds at last)
@@ -121,26 +137,24 @@ export function AuditProgress({
       }
     };
 
-    const run = async () => {
-      const aiOk = await sayAi(segments[0]!.text);
-      if (cancelled) return;
-      if (!aiOk) speakBrowser(segments[0]!.text);
+    // Line 1 speaks INSTANTLY via the free browser voice (Gemini would add a
+    // 1–2s synth delay before the first word). Lines 2+ use the premium Gemini
+    // voice, fetched in the background while line 1 plays (falling back to the
+    // browser voice per line if Gemini is off/slow/failing).
+    const run = () => {
+      speakBrowser(segments[0]!.text);
       for (let i = 1; i < segments.length; i++) {
         const seg = segments[i]!;
         timers.push(
           setTimeout(async () => {
             if (cancelled) return;
-            if (aiOk) {
-              const ok = await sayAi(seg.text);
-              if (!ok && !cancelled) speakBrowser(seg.text);
-            } else {
-              speakBrowser(seg.text);
-            }
+            const ok = await sayAi(seg.text);
+            if (!ok && !cancelled) speakBrowser(seg.text);
           }, seg.at),
         );
       }
     };
-    void run();
+    run();
 
     return () => {
       cancelled = true;
@@ -182,6 +196,35 @@ export function AuditProgress({
 
       {/* ── Battle scene: your site vs the competitor, clashing head-to-head ── */}
       <div className="relative z-10 mb-9 flex items-center justify-center gap-1 sm:gap-4">
+        {/* Attack words the two sites fire at each other across the centre.
+            3 lanes per side, rotating through the full pool each volley. */}
+        <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
+          {[0, 1, 2].map((i) => {
+            const w = RIGHT_WORDS[(volley * 3 + i) % RIGHT_WORDS.length]!;
+            return (
+              <span
+                key={`r${volley}-${i}`}
+                className="absolute left-1/4 whitespace-nowrap rounded-md bg-emerald-500/90 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white shadow-lg"
+                style={{ top: `${24 + i * 20}%`, animation: `flyRight 3s ${i * 0.4}s ease-in-out` }}
+              >
+                {w} →
+              </span>
+            );
+          })}
+          {[0, 1, 2].map((i) => {
+            const w = LEFT_WORDS[(volley * 3 + i) % LEFT_WORDS.length]!;
+            return (
+              <span
+                key={`l${volley}-${i}`}
+                className="absolute right-1/4 whitespace-nowrap rounded-md bg-rose-500/90 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white shadow-lg"
+                style={{ top: `${34 + i * 20}%`, animation: `flyLeft 3s ${i * 0.4 + 0.6}s ease-in-out` }}
+              >
+                ← {w}
+              </span>
+            );
+          })}
+        </div>
+
         <BattleDevice url={yourUrl} label="You" tone="you" attack="attackYou" />
 
         {/* Center clash + VS */}
@@ -249,6 +292,21 @@ export function AuditProgress({
         @keyframes attackComp { 0%,100%{transform:translateX(0)} 44%{transform:translateX(-14px) scale(1.04)} 56%{transform:translateX(-9px)} 68%{transform:translateX(0)} }
         @keyframes clashBurst { 0%,38%,62%,100%{opacity:0;transform:scale(.4)} 50%{opacity:1;transform:scale(1.35)} }
         @keyframes vsPulse { 0%,100%{transform:scale(1) rotate(-4deg)} 50%{transform:scale(1.3) rotate(4deg)} }
+        /* Attack words fired across the centre, meeting at the clash (~50%) */
+        @keyframes flyRight {
+          0%{opacity:0;transform:translateX(-30px) scale(.7)}
+          15%{opacity:1;transform:translateX(0) scale(1)}
+          50%{opacity:1;transform:translateX(70px) scale(1.05)}
+          72%{opacity:0;transform:translateX(120px) scale(.7)}
+          100%{opacity:0}
+        }
+        @keyframes flyLeft {
+          0%{opacity:0;transform:translateX(30px) scale(.7)}
+          15%{opacity:1;transform:translateX(0) scale(1)}
+          50%{opacity:1;transform:translateX(-70px) scale(1.05)}
+          72%{opacity:0;transform:translateX(-120px) scale(.7)}
+          100%{opacity:0}
+        }
         /* Build up (staggered per block), hold, then glitch & shatter, then rebuild */
         @keyframes buildBreak {
           0%   { opacity:0; transform: translateY(10px) scale(.9); filter:none; }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { QrCode as QrIcon, Download, Printer, Trash2, Loader2, Plus } from "lucide-react";
+import { QrCode as QrIcon, Download, Printer, Trash2, Loader2, Plus, Copy, ExternalLink } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../lib/api-client";
 import { appUrl } from "../lib/app-url";
@@ -215,12 +215,33 @@ export function QrCodesPage() {
                           {qr.visitorType.name}
                         </span>
                       )}
-                      <p className="mt-1 font-mono text-xs text-gray-400">/{qr.shortCode}</p>
+                      {/* Full link — clickable to open on desktop, or copy to share */}
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={url}
+                        className="mt-1 flex items-center justify-center gap-1 truncate font-mono text-xs text-indigo-600 hover:underline"
+                      >
+                        <ExternalLink size={11} className="shrink-0" />
+                        <span className="truncate">{url.replace(/^https?:\/\//, "")}</span>
+                      </a>
                       <p className="mt-1 text-xs text-gray-400">
                         {qr.scanCount} scans · {formatDate(qr.createdAt)}
                       </p>
                     </div>
                     <div className="mt-4 flex w-full items-center justify-center gap-1">
+                      <IconBtn
+                        title="Copy link (to fill the form on a desktop)"
+                        onClick={() => {
+                          navigator.clipboard.writeText(url).then(
+                            () => toast.success("Link copied"),
+                            () => toast.error("Couldn't copy"),
+                          );
+                        }}
+                      >
+                        <Copy size={16} />
+                      </IconBtn>
                       <IconBtn title="Download PNG" onClick={() => downloadQrPng(url, fileName)}>
                         <Download size={16} />
                       </IconBtn>

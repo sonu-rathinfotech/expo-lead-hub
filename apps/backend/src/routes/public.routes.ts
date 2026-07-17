@@ -55,6 +55,10 @@ type ActiveForm = NonNullable<
 >;
 
 const formCache = new TtlCache<ActiveForm>(60_000);
+// Hot public reads that change rarely / are static per key — short TTLs shave a
+// Postgres round-trip per visitor without any noticeable staleness.
+const boothContextCache = new TtlCache<unknown>(30_000);
+const playSessionCache = new TtlCache<unknown>(15_000);
 
 async function getActiveForm(eventId: string): Promise<ActiveForm | null> {
   const cached = formCache.get(eventId);
@@ -71,6 +75,9 @@ async function getActiveForm(eventId: string): Promise<ActiveForm | null> {
 router.get(
   "/booth-context",
   asyncHandler(async (_req: Request, res: Response) => {
+    const cached = boothContextCache.get("ctx");
+    if (cached) return res.json(cached);
+
     const event = await prisma.event.findFirst({
       where: { status: "ACTIVE" },
       orderBy: { startDate: "desc" },
@@ -92,7 +99,7 @@ router.get(
       throw new AppError(404, "No active event configured");
     }
 
-    res.json({
+    const payload = {
       event: {
         id: event.id,
         name: event.name,
@@ -100,7 +107,9 @@ router.get(
         bannerImageUrl: event.bannerImageUrl,
       },
       booth: event.booths[0] ?? null,
-    });
+    };
+    boothContextCache.set("ctx", payload);
+    res.json(payload);
   }),
 );
 
@@ -345,6 +354,10 @@ router.get(
   "/play/:token",
   asyncHandler(async (req: Request, res: Response) => {
     const token = req.params.token as string;
+
+    const cached = playSessionCache.get(token);
+    if (cached) return res.json(cached);
+
     const lead = await prisma.lead.findUnique({
       where: { playToken: token },
       select: {
@@ -363,12 +376,14 @@ router.get(
     const phone =
       data.mobile_number ?? data.mobileNumber ?? data.phone ?? data.phone_number ?? data.mobile ?? "";
 
-    res.json({
+    const payload = {
       token,
       visitor: { name, company, email, phone },
       event: lead.event,
       games: GAMES,
-    });
+    };
+    playSessionCache.set(token, payload);
+    res.json(payload);
   }),
 );
 

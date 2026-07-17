@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { CheckCircle2, AlertTriangle, Loader2, Gamepad2, Phone, Search } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Loader2, Gamepad2, Search } from "lucide-react";
 import { publicApi } from "../lib/api-client";
 import { DynamicForm, type FormFieldDef } from "../components/DynamicForm";
 import { applyContactToFields, bniToContact, type Contact } from "../lib/contact-fields";
@@ -68,21 +68,24 @@ export function PublicLeadForm() {
     setQuickMsg(msg);
   };
 
-  // Path 2 — phone-first BNI auto-fetch.
+  // Path 2 — BNI auto-fetch by name, email OR phone.
   const lookupPhone = async () => {
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length < 6) {
-      setQuickMsg({ tone: "warn", text: "Enter a valid phone number." });
+    const q = phone.trim();
+    if (q.length < 3) {
+      setQuickMsg({ tone: "warn", text: "Enter your name, email or phone." });
       return;
     }
     setBusy("phone");
     try {
-      const { data: res } = await publicApi.bniLookup(phone.trim());
+      const { data: res } = await publicApi.bniLookup(q);
       const m = res?.members?.[0];
       if (m) {
-        applyContact({ ...bniToContact(m), phone: phone.trim() }, { tone: "ok", text: `Found you, ${m.name}! Please review and confirm below.` });
+        applyContact(bniToContact(m), { tone: "ok", text: `Found you, ${m.name}! Please review and confirm below.` });
       } else {
-        applyContact({ phone: phone.trim() }, { tone: "warn", text: "No match found — please fill in your details below." });
+        // Seed the phone only if they actually typed digits.
+        const digits = q.replace(/\D/g, "");
+        const seed = digits.length >= 6 ? { phone: q } : {};
+        applyContact(seed, { tone: "warn", text: "No match found — please fill in your details below." });
       }
     } catch {
       setQuickMsg({ tone: "warn", text: "Lookup failed — please fill in your details below." });
@@ -192,13 +195,12 @@ export function PublicLeadForm() {
           <div className="mb-5 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
             <p className="mb-3 text-sm font-semibold text-indigo-900">BNI member? Auto-fill in seconds</p>
             <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-white px-3">
-              <Phone size={15} className="text-indigo-400" />
+              <Search size={15} className="text-indigo-400" />
               <input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && lookupPhone()}
-                inputMode="tel"
-                placeholder="Your phone number"
+                placeholder="Name, email or phone"
                 className="w-full bg-transparent py-2 text-sm focus:outline-none"
               />
               <button

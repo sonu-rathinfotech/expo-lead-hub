@@ -32,10 +32,14 @@
     border: 1px solid #cbd5e1 !important;
     box-shadow: none !important;
   }
-  /* Screenshots can be very tall — cap them so they don't create blank pages. */
-  [data-report] img {
-    max-height: 280px !important;
-    object-fit: contain !important;
+  /* Full-page screenshots are very tall — show a cropped top preview at a
+     capped height (object-cover keeps them filling the width, not squeezed
+     into a thin strip). Excludes the logo, which keeps its own fit. */
+  [data-report] .report-shot {
+    max-height: 260px !important;
+    object-fit: cover !important;
+    object-position: top !important;
+    width: 100% !important;
   }
 }
 

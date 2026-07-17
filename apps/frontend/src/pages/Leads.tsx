@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Download, Search, Loader2, Trash2, Gamepad2, Mail, Copy, CalendarClock, CheckCircle2, FileText } from "lucide-react";
+import { Download, Search, Loader2, Trash2, Gamepad2, Mail, Copy, CalendarClock, CheckCircle2, FileText, RefreshCw } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../lib/api-client";
 import { appUrl } from "../lib/app-url";
@@ -251,14 +251,24 @@ export function LeadsPage() {
           <h2 className="text-2xl font-bold text-gray-900">Data</h2>
           <p className="mt-1 text-sm text-gray-500">{total} total</p>
         </div>
-        <button
-          onClick={handleExport}
-          disabled={exporting}
-          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
-        >
-          {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-          Export CSV
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => qc.invalidateQueries({ queryKey: ["leads"] })}
+            disabled={isFetching}
+            title="Refresh — check for new leads"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+          >
+            <RefreshCw size={16} className={isFetching ? "animate-spin" : ""} /> Refresh
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+          >
+            {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            Export CSV
+          </button>
+        </div>
       </div>
 
       {/* Filters */}

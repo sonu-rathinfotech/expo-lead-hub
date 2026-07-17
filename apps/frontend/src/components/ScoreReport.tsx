@@ -194,7 +194,7 @@ function Shot({ title, url, shot, tone }: { title: string; url?: string | null; 
           the browser drops background colours in the PDF */}
       <div className={`px-4 py-2 text-sm font-semibold text-white ${bar} print:bg-gray-100 print:text-gray-800`}>{title}</div>
       {shot ? (
-        <img src={shot} alt="" className="max-h-64 w-full object-cover object-top" />
+        <img src={shot} alt="" className="report-shot max-h-64 w-full object-cover object-top" />
       ) : (
         <div className="flex h-40 items-center justify-center bg-gray-50 text-gray-300 print:hidden"><Monitor size={28} /></div>
       )}

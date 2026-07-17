@@ -86,14 +86,13 @@ export async function notifyLeadReceived(leadId: string): Promise<void> {
 
   // Track whether an explicit config handled each channel; if not, we fall back
   // to a sensible default below (so email/WhatsApp still go out with zero setup).
-  let emailHandled = false;
+  let emailWelcomeSent = false;
   let waHandled = false;
 
   for (const cfg of configs) {
     const triggers = (cfg.events as string[] | null) ?? [];
     if (!triggers.includes("LEAD_RECEIVED")) continue;
     const c = (cfg.config ?? {}) as ChannelConfig;
-    if (cfg.channel === "EMAIL") emailHandled = true;
     if (cfg.channel === "WHATSAPP") waHandled = true;
 
     if (cfg.channel === "WHATSAPP" && visitorPhone) {
@@ -118,7 +117,8 @@ export async function notifyLeadReceived(leadId: string): Promise<void> {
     if (cfg.channel === "EMAIL" && visitorEmail) {
       const subject = render(c.subject || DEFAULT_EMAIL_SUBJECT, vars);
       const parts: string[] = [];
-      if (c.welcomeEnabled !== false) parts.push(render(c.welcomeTemplate || DEFAULT_EMAIL_WELCOME, vars));
+      const includeWelcome = c.welcomeEnabled !== false;
+      if (includeWelcome) parts.push(render(c.welcomeTemplate || DEFAULT_EMAIL_WELCOME, vars));
       // Report is opt-in for email — the welcome already reads as a full signed
       // message; appending a "captured fields" block would look odd.
       if (c.reportEnabled === true) parts.push(render(c.reportTemplate || DEFAULT_REPORT, vars));
@@ -126,6 +126,7 @@ export async function notifyLeadReceived(leadId: string): Promise<void> {
         await emailService
           .sendEmail(visitorEmail, subject, parts.join("\n\n"))
           .catch((e) => console.error("[email] notification failed:", (e as Error)?.message));
+        if (includeWelcome) emailWelcomeSent = true;
       }
     }
   }
@@ -133,10 +134,12 @@ export async function notifyLeadReceived(leadId: string): Promise<void> {
   // ── Defaults when no config exists for a channel ──
   // Booth "just works": a visitor with an email always gets the welcome (with
   // their game link), even if no Email automation was configured for the event.
-  if (!emailHandled && visitorEmail && emailService.isEmailConfigured()) {
+  // Welcome email always goes out — if no active config sent one, send the
+  // default. (Automatic; needs no Automation setup.)
+  if (!emailWelcomeSent && visitorEmail && emailService.isEmailConfigured()) {
     await emailService
       .sendEmail(visitorEmail, render(DEFAULT_EMAIL_SUBJECT, vars), render(DEFAULT_EMAIL_WELCOME, vars))
-      .catch((e) => console.error("[email] default notification failed:", (e as Error)?.message));
+      .catch((e) => console.error("[email] default welcome failed:", (e as Error)?.message));
   }
   if (!waHandled && visitorPhone && setting("OPENWA_BASE_URL") && setting("OPENWA_API_KEY")) {
     const chatId = whatsAppService.toChatId(visitorPhone);

@@ -36,18 +36,14 @@ Ready to increase your agency profits? Let's schedule a demo.`;
 
 export const DEFAULT_REPORT_TEMPLATE = `Hi,
 
-Your AI website audit is ready:
+Your AI Visibility report is ready — here's how discoverable and understandable your website is to AI assistants like ChatGPT, Gemini and Perplexity.
 
-Overall score — Your site: {yourScore}/100  |  Competitor: {competitorScore}/100
+Your site:  {yourScore}
+Partner:    {competitorScore}
 
 {reasoning}
 
-── Your site's SEO snapshot ──
-Domain Authority: {da}   Page Authority: {pa}
-Referring domains: {referringDomains}   Backlinks: {backlinks}
-Ranking keywords: {keywords}   Est. organic traffic: {traffic}
-
-See the full report: {reportLink}`;
+See your full AI Visibility report: {reportLink}`;
 
 // Meeting confirmation email — its own copy + signature (distinct from reports).
 export const DEFAULT_MEETING_TEMPLATE = `Hi {name},
@@ -136,7 +132,7 @@ export const SETTINGS: SettingDef[] = [
     label: "AI Score report email",
     group: "Email templates",
     type: "textarea",
-    hint: "Placeholders: {yourScore} {competitorScore} {reasoning} {da} {pa} {referringDomains} {backlinks} {keywords} {traffic} {reportLink}. The signature is added automatically.",
+    hint: "AI Visibility report. Placeholders: {yourScore} {competitorScore} {reasoning} {reportLink} (each score reads like ‘82 (B)’). The signature is added automatically.",
   },
   {
     key: "MEETING_NOTIFY_EMAIL",

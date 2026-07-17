@@ -1,8 +1,7 @@
 import { prisma } from "@elc/db";
 import { emailService } from "./email.service";
 import { reportLink } from "../utils/play-link";
-import { inr } from "./profit-calc.service";
-import { buildCalcEmail, buildReportEmail } from "./email-templates.service";
+import { buildReportEmail } from "./email-templates.service";
 
 // Manually (re)send the game result report(s) for a lead — used when the
 // automatic result email didn't go out. Sends to the email on the lead's form.
@@ -28,16 +27,11 @@ export async function sendReportsForLead(
   let sent = 0;
   for (const g of games) {
     try {
+      // Only the AI report email is (re)sent — calculator results are not emailed.
       if (g.gameType === "AI_SCORE" && g.refId) {
         const a = await prisma.websiteAnalysis.findUnique({ where: { id: g.refId } });
         if (a && a.status === "COMPLETED") {
-          await emailService.sendEmail(email, "Your AI Website Audit is ready", scoreEmailText(a));
-          sent++;
-        }
-      } else if (g.gameType === "PROFIT_CALC") {
-        const p = (g.payload ?? {}) as any;
-        if (p?.results) {
-          await emailService.sendEmail(email, "Your partnership profitability snapshot", calcEmailText(p));
+          await emailService.sendEmail(email, "Your AI Visibility report is ready", scoreEmailText(a));
           sent++;
         }
       }
@@ -62,31 +56,19 @@ export async function sendReportsForLead(
 
 function scoreEmailText(a: any): string {
   const au = a.audit ?? {};
-  const m = au.metrics?.your ?? {};
-  const num = (v: any) => (v == null ? "—" : Number(v).toLocaleString());
+  // AI Visibility report — score reads like "82 (B)".
+  const fmt = (s: any) => (s ? `${s.score ?? "—"} (${s.grade ?? "—"})` : "—");
   return buildReportEmail({
-    yourScore: au.your?.overallScore ?? "—",
-    competitorScore: au.competitor?.overallScore ?? "—",
-    reasoning: au.verdict?.reasoning ?? "",
-    da: num(m.da),
-    pa: num(m.pa),
-    referringDomains: num(m.referringDomains),
-    backlinks: num(m.backlinks),
-    keywords: num(m.keywordCount),
-    traffic: num(m.organicTraffic),
+    yourScore: fmt(au.your),
+    competitorScore: fmt(au.competitor),
+    reasoning: au.comparison?.paragraph ?? au.verdict?.reasoning ?? "",
+    da: "—",
+    pa: "—",
+    referringDomains: "—",
+    backlinks: "—",
+    keywords: "—",
+    traffic: "—",
     reportLink: reportLink(a.id),
   });
 }
 
-function calcEmailText(p: any): string {
-  const r = p.results ?? {};
-  const per = p.inputs?.period === "year" ? "yearly" : "monthly";
-  return buildCalcEmail({
-    period: per,
-    clients: r.clients,
-    revenue: inr(r.revenue),
-    rathCharges: inr(r.rathCharges),
-    internalExpenses: inr(r.internalExpenses),
-    profit: inr(r.profit),
-  });
-}

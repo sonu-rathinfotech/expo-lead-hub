@@ -567,6 +567,10 @@ export function ScoreReport({ data, onBookMeeting }: { data: Comparison; onBookM
   // Who this report is for — drives the header + the saved PDF filename.
   const who = data.company || hostOf(data.url) || "Website";
   const reportDate = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  // Drop a real logo at apps/frontend/public/rath-logo.png (or .svg) — it shows
+  // automatically; until then we fall back to the "R" wordmark below.
+  const [logoOk, setLogoOk] = useState(true);
+  const logoSrc = `${import.meta.env.BASE_URL}rath-logo.png`;
 
   const downloadPdf = () => {
     const prev = document.title;
@@ -596,24 +600,47 @@ export function ScoreReport({ data, onBookMeeting }: { data: Comparison; onBookM
           '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
       }}
     >
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 border-b border-gray-200 pb-5">
-        <div className="min-w-0">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-indigo-600">
-            <Sparkles size={12} /> AI Visibility Report
-          </span>
-          <h1 className="mt-2 truncate text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl" title={who}>{who}</h1>
-          <p className="mt-1 max-w-xl text-sm leading-relaxed text-gray-600">
-            How discoverable <span className="font-medium text-gray-700">{hostOf(data.url) || "your site"}</span> is to AI assistants — ChatGPT, Gemini, Perplexity &amp; Google AI Overviews.
-          </p>
-          <p className="mt-2 text-xs font-medium text-gray-400">Prepared {reportDate} · Rath Infotech</p>
+      {/* ── Report header (centered, logo on top) ── */}
+      <div className="border-b-2 border-gray-900/90 pb-6">
+        {/* Download — right aligned, hidden in the PDF */}
+        <div className="mb-1 flex justify-end print:hidden">
+          <button
+            onClick={downloadPdf}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
+          >
+            <Download size={16} /> Download PDF
+          </button>
         </div>
-        <button
-          onClick={downloadPdf}
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 print:hidden"
-        >
-          <Download size={16} /> Download PDF
-        </button>
+
+        <div className="text-center">
+          {/* Rath logo (centered) — drop apps/frontend/public/rath-logo.png */}
+          <div className="flex justify-center">
+            {logoOk ? (
+              <img src={logoSrc} onError={() => setLogoOk(false)} alt="Rath Infotech & Web Solutions Pvt. Ltd." className="h-16 w-auto max-w-[320px] object-contain" />
+            ) : (
+              <div className="flex items-center gap-3">
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-2xl font-black text-white shadow-md ring-1 ring-black/5">
+                  R
+                </span>
+                <div className="text-left leading-tight">
+                  <p className="text-xl font-extrabold tracking-[0.15em] text-gray-900">RATH</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Infotech &amp; Web Solutions Pvt. Ltd.</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Big centered heading */}
+          <h1 className="mt-6 flex items-center justify-center gap-2 text-3xl font-black tracking-tight text-gray-900 sm:text-4xl">
+            <Sparkles className="text-indigo-500" size={26} /> AI Visibility Report
+          </h1>
+          <p className="mt-1.5 text-lg font-bold text-gray-700" title={who}>{who}</p>
+          <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-gray-600">
+            How discoverable <span className="font-semibold text-gray-800">{hostOf(data.url) || "your site"}</span> is to AI
+            assistants — ChatGPT, Gemini, Perplexity &amp; Google AI Overviews.
+          </p>
+          <p className="mt-3 text-xs font-medium text-gray-400">Prepared {reportDate} · Rath Infotech &amp; Web Solutions Pvt. Ltd.</p>
+        </div>
       </div>
 
       {/* Urgency framing (static) */}

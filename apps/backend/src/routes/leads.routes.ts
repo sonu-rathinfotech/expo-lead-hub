@@ -116,10 +116,15 @@ router.get(
     const played = tokens.length
       ? await prisma.gameResult.findMany({
           where: { playToken: { in: tokens }, status: "COMPLETED" },
-          select: { playToken: true },
+          select: { playToken: true, gameType: true, refId: true },
         })
       : [];
     const playedSet = new Set(played.map((g) => g.playToken));
+    // Map each play session to its AI report id (for a "View report" link).
+    const analysisByToken = new Map<string, string>();
+    for (const g of played) {
+      if (g.gameType === "AI_SCORE" && g.refId && g.playToken) analysisByToken.set(g.playToken, g.refId);
+    }
 
     res.json({
       leads: leads.map((l: any) => ({
@@ -135,6 +140,7 @@ router.get(
         submittedByUser: l.submittedByUser,
         playToken: l.playToken,
         gamePlayed: l.playToken ? playedSet.has(l.playToken) : false,
+        analysisId: l.playToken ? analysisByToken.get(l.playToken) ?? null : null,
         reportsSentCount: l.reportsSentCount,
         meetingAt: l.meetingAt,
         ...summarize(l.rawFormData),

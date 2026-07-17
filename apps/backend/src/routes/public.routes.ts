@@ -11,9 +11,7 @@ import { searchBni, lookupBniByPhone } from "../services/bni-cache.service";
 import { parseCardWithAI } from "../services/card-parser.service";
 import { normalizeUrl, checkReachable, hostOf } from "../services/page-analyzer.service";
 import { enqueueAnalysis, queueInfo } from "../services/analysis-queue.service";
-import { computeProfit, inr } from "../services/profit-calc.service";
-import { emailService } from "../services/email.service";
-import { buildCalcEmail } from "../services/email-templates.service";
+import { computeProfit } from "../services/profit-calc.service";
 import { synthesizeSpeech } from "../services/tts.service";
 import { bookMeeting } from "../services/meeting.service";
 
@@ -654,23 +652,9 @@ router.post(
         .catch(() => {});
     }
 
-    // Email the results (best-effort).
-    if (email && emailService.isEmailConfigured()) {
-      const per = p.period === "year" ? "yearly" : "monthly";
-      const text = buildCalcEmail({
-        period: per,
-        clients: results.clients,
-        revenue: inr(results.revenue),
-        rathCharges: inr(results.rathCharges),
-        internalExpenses: inr(results.internalExpenses),
-        profit: inr(results.profit),
-      });
-      void emailService
-        .sendEmail(email, "Your partnership profitability snapshot", text)
-        .catch((e) => console.error("[calculator] email failed:", (e as Error)?.message));
-    }
-
-    res.json({ results, emailed: Boolean(email && emailService.isEmailConfigured()) });
+    // Calculator results are saved but NOT emailed — only the welcome and the
+    // AI report emails go out.
+    res.json({ results, emailed: false });
   }),
 );
 

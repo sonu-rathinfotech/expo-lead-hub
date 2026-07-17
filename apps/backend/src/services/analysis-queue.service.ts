@@ -45,7 +45,7 @@ async function emailReport(job: Job, result: VisibilityReport) {
   });
 
   await emailService
-    .sendEmail(job.email, "Your AI Website Audit is ready", body)
+    .sendEmail(job.email, "Your AI Visibility report is ready", body)
     .then(async () => {
       // Reflect the auto-send in the lead's "Sent" counter (Leads list).
       if (job.playToken) {

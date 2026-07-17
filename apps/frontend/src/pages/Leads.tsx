@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Download, Search, Loader2, Trash2, Gamepad2, Mail, Copy, CalendarClock, CheckCircle2 } from "lucide-react";
+import { Download, Search, Loader2, Trash2, Gamepad2, Mail, Copy, CalendarClock, CheckCircle2, FileText } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../lib/api-client";
 import { appUrl } from "../lib/app-url";
@@ -28,6 +28,7 @@ interface LeadRow {
   submittedByUser?: { id: string; name: string } | null;
   playToken?: string | null;
   gamePlayed?: boolean;
+  analysisId?: string | null;
   reportsSentCount?: number;
   meetingAt?: string | null;
 }
@@ -142,6 +143,19 @@ export function LeadsPage() {
         >
           <Copy size={14} /> Link
         </button>
+      )}
+
+      {/* View the AI Visibility report (icon only) */}
+      {lead.analysisId && (
+        <a
+          href={appUrl(`/ai/report/${lead.analysisId}`)}
+          target="_blank"
+          rel="noreferrer"
+          title="View / download the AI Visibility report"
+          className="inline-flex items-center rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:bg-indigo-50 hover:text-indigo-600"
+        >
+          <FileText size={16} />
+        </a>
       )}
 
       {/* Send / Resend report — clearer states */}

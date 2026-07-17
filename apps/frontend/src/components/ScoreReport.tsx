@@ -600,47 +600,49 @@ export function ScoreReport({ data, onBookMeeting }: { data: Comparison; onBookM
           '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
       }}
     >
-      {/* ── Report header (centered, logo on top) ── */}
-      <div className="border-b-2 border-gray-900/90 pb-6">
-        {/* Download — right aligned, hidden in the PDF */}
-        <div className="mb-1 flex justify-end print:hidden">
-          <button
-            onClick={downloadPdf}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50"
-          >
-            <Download size={16} /> Download PDF
-          </button>
-        </div>
-
-        <div className="text-center">
-          {/* Rath logo (centered) — drop apps/frontend/public/rath-logo.png */}
-          <div className="flex justify-center">
+      {/* ── Report header — one row: logo left · heading centre · download right ── */}
+      <div className="border-b-2 border-gray-900/90 pb-5">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+          {/* Left: logo */}
+          <div className="flex justify-start">
             {logoOk ? (
-              <img src={logoSrc} onError={() => setLogoOk(false)} alt="Rath Infotech & Web Solutions Pvt. Ltd." className="h-16 w-auto max-w-[320px] object-contain" />
+              <img src={logoSrc} onError={() => setLogoOk(false)} alt="Rath Infotech & Web Solutions Pvt. Ltd." className="h-12 w-auto max-w-[240px] object-contain" />
             ) : (
-              <div className="flex items-center gap-3">
-                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-2xl font-black text-white shadow-md ring-1 ring-black/5">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-xl font-black text-white shadow-md ring-1 ring-black/5">
                   R
                 </span>
-                <div className="text-left leading-tight">
-                  <p className="text-xl font-extrabold tracking-[0.15em] text-gray-900">RATH</p>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Infotech &amp; Web Solutions Pvt. Ltd.</p>
+                <div className="leading-tight">
+                  <p className="text-lg font-extrabold tracking-[0.15em] text-gray-900">RATH</p>
+                  <p className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">Infotech &amp; Web Solutions</p>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Big centered heading */}
-          <h1 className="mt-6 flex items-center justify-center gap-2 text-3xl font-black tracking-tight text-gray-900 sm:text-4xl">
-            <Sparkles className="text-indigo-500" size={26} /> AI Visibility Report
-          </h1>
-          <p className="mt-1.5 text-lg font-bold text-gray-700" title={who}>{who}</p>
-          <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-gray-600">
-            How discoverable <span className="font-semibold text-gray-800">{hostOf(data.url) || "your site"}</span> is to AI
-            assistants — ChatGPT, Gemini, Perplexity &amp; Google AI Overviews.
-          </p>
-          <p className="mt-3 text-xs font-medium text-gray-400">Prepared {reportDate} · Rath Infotech &amp; Web Solutions Pvt. Ltd.</p>
+          {/* Centre: heading */}
+          <div className="text-center">
+            <h1 className="flex items-center justify-center gap-2 whitespace-nowrap text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">
+              <Sparkles className="text-indigo-500" size={24} /> AI Visibility Report
+            </h1>
+            <p className="mt-0.5 text-sm font-bold text-gray-700" title={who}>{who}</p>
+          </div>
+
+          {/* Right: download */}
+          <div className="flex justify-end">
+            <button
+              onClick={downloadPdf}
+              className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 print:hidden"
+            >
+              <Download size={16} /> Download PDF
+            </button>
+          </div>
         </div>
+
+        <p className="mt-3 text-center text-xs text-gray-400">
+          How discoverable <span className="font-medium text-gray-500">{hostOf(data.url) || "your site"}</span> is to AI
+          assistants — ChatGPT, Gemini, Perplexity &amp; Google AI Overviews · Prepared {reportDate}
+        </p>
       </div>
 
       {/* Urgency framing (static) */}

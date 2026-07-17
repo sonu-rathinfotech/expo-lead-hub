@@ -6,8 +6,7 @@ import { api } from "../lib/api-client";
 import { downscale } from "../lib/ocr";
 import { useAuthStore } from "../stores/auth.store";
 import { DynamicForm, type FormFieldDef } from "../components/DynamicForm";
-import { useSearchParams } from "react-router-dom";
-import { appUrl } from "../lib/app-url";
+import { useSearchParams, useNavigate } from "react-router-dom";
 
 interface ParsedData {
   companyName?: string;
@@ -48,6 +47,7 @@ const DEFAULT_MANUAL_FIELDS: FormFieldDef[] = [
 
 export function OcrScanPage() {
   const user = useAuthStore((s) => s.user);
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const startManual = params.get("manual") === "1";
   const [eventId, setEventId] = useState("");
@@ -168,24 +168,52 @@ export function OcrScanPage() {
     setManual(false);
   };
 
+  // The lead form (OCR-prefilled when a card was scanned, else the manual form).
+  // Opens the game in a new tab on submit; the capture tab stays for the next visitor.
+  const renderLeadForm = () => {
+    const formFields = scan
+      ? injectOcr(activeFields, scan.parsed)
+      : activeFields.length
+        ? activeFields
+        : form
+          ? DEFAULT_MANUAL_FIELDS
+          : [];
+    if (formFields.length === 0) {
+      return <p className="py-10 text-center text-sm text-amber-600">This event has no form configured.</p>;
+    }
+    return (
+      <DynamicForm
+        key={scan ? scanKey : "manual"}
+        fields={formFields}
+        submitting={submitMutation.isPending}
+        onSubmit={(values) => {
+          // Save the lead, then go straight into the game on THIS screen (single
+          // booth iPad). "Back to home" on the game returns for the next capture.
+          submitMutation.mutate(values, {
+            onSuccess: (res: any) => {
+              const token = res?.data?.playToken;
+              if (token) navigate(`/play/${token}`);
+            },
+          });
+        }}
+      />
+    );
+  };
+
   if (done) {
     return (
       <div className="mx-auto max-w-md rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
         <CheckCircle2 className="mx-auto mb-3 text-green-500" size={48} />
         <h2 className="text-xl font-bold text-gray-900">Lead captured</h2>
-        <p className="mt-2 text-sm text-gray-600">
-          Saved. The game opened in a new tab — if a pop-up was blocked, use the button below.
-        </p>
+        <p className="mt-2 text-sm text-gray-600">Saved. Let them play a quick game right here.</p>
 
         {playToken && (
-          <a
-            href={appUrl(`/play/${playToken}`)}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            onClick={() => navigate(`/play/${playToken}`)}
             className="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
           >
-            <Gamepad2 size={16} /> Open game
-          </a>
+            <Gamepad2 size={16} /> Play now
+          </button>
         )}
 
         <div className="mt-6">
@@ -203,9 +231,11 @@ export function OcrScanPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-2xl font-bold text-gray-900">Capture Lead</h2>
+        <h2 className="text-2xl font-bold text-gray-900">{startManual ? "Manual Entry" : "Capture Lead"}</h2>
         <p className="mt-1 text-sm text-gray-500">
-          Scan a business card to auto-fill, or enter the details manually — then save the lead.
+          {startManual
+            ? "Fill in the visitor's details, then save the lead."
+            : "Scan a business card to auto-fill, or enter the details manually — then save the lead."}
         </p>
       </div>
 
@@ -221,6 +251,12 @@ export function OcrScanPage() {
 
       {!ready ? (
         <p className="text-sm text-gray-400">Select an event, booth, and visitor type to begin.</p>
+      ) : startManual ? (
+        // Manual Form — just the form, no card-scan UI.
+        <div className="max-w-2xl rounded-lg border border-gray-200 bg-white p-5">
+          <h3 className="mb-3 font-semibold text-gray-900">Enter lead details</h3>
+          {renderLeadForm()}
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {/* Capture */}
@@ -294,42 +330,7 @@ export function OcrScanPage() {
             {!scan && !manual ? (
               <p className="py-10 text-center text-sm text-gray-400">Scan a card, or choose “enter details manually”.</p>
             ) : (
-              (() => {
-                // Manual entry falls back to a basic contact form when the event's
-                // dynamic form has no active fields, so staff can always type a lead.
-                const formFields = scan
-                  ? injectOcr(activeFields, scan.parsed)
-                  : activeFields.length
-                    ? activeFields
-                    : form
-                      ? DEFAULT_MANUAL_FIELDS
-                      : [];
-                return formFields.length === 0 ? (
-                  <p className="py-10 text-center text-sm text-amber-600">This event has no form configured.</p>
-                ) : (
-                  <DynamicForm
-                    key={scan ? scanKey : "manual"}
-                    fields={formFields}
-                    submitting={submitMutation.isPending}
-                    onSubmit={(values) => {
-                      // Open the game in a NEW tab right away (inside this click,
-                      // so popup blockers allow it); point it at the play link
-                      // once the token comes back. The capture tab stays put for
-                      // the next visitor.
-                      const gameTab = window.open("about:blank", "_blank");
-                      submitMutation.mutate(values, {
-                        onSuccess: (res: any) => {
-                          const token = res?.data?.playToken;
-                          if (!gameTab) return;
-                          if (token) gameTab.location.href = appUrl(`/play/${token}`);
-                          else gameTab.close();
-                        },
-                        onError: () => gameTab?.close(),
-                      });
-                    }}
-                  />
-                );
-              })()
+              renderLeadForm()
             )}
           </div>
         </div>

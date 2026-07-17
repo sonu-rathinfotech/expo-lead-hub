@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Download, Search, Loader2, Trash2, Gamepad2, Mail, Copy, CalendarClock } from "lucide-react";
+import { Download, Search, Loader2, Trash2, Gamepad2, Mail, Copy, CalendarClock, CheckCircle2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../lib/api-client";
 import { appUrl } from "../lib/app-url";
@@ -100,6 +100,116 @@ export function LeadsPage() {
     setPage(0);
   };
 
+  const btn = "inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium";
+
+  // The per-lead action buttons — shared by the desktop table + the mobile cards.
+  const leadActions = (lead: LeadRow) => (
+    <>
+      {/* Play / Played */}
+      {lead.playToken && !lead.gamePlayed ? (
+        <a
+          href={appUrl(`/play/${lead.playToken}`)}
+          target="_blank"
+          rel="noreferrer"
+          title="Open game on this device"
+          className={`${btn} border-indigo-200 text-indigo-600 hover:bg-indigo-50`}
+        >
+          <Gamepad2 size={14} /> Play
+        </a>
+      ) : lead.gamePlayed ? (
+        <span title="Game finished" className={`${btn} border-emerald-200 bg-emerald-50 text-emerald-700`}>
+          <CheckCircle2 size={14} /> Played
+        </span>
+      ) : (
+        <span title="No game session yet" className={`${btn} border-gray-100 text-gray-300`}>
+          <Gamepad2 size={14} /> Play
+        </span>
+      )}
+
+      {/* Copy play link — only while the game hasn't been played yet */}
+      {lead.playToken && !lead.gamePlayed && (
+        <button
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(appUrl(`/play/${lead.playToken}`));
+              toast.success("Play link copied");
+            } catch {
+              toast.error("Couldn't copy — copy it manually from the address bar");
+            }
+          }}
+          title="Copy play link (share to their phone)"
+          className={`${btn} border-gray-200 text-gray-600 hover:bg-gray-50`}
+        >
+          <Copy size={14} /> Link
+        </button>
+      )}
+
+      {/* Send / Resend report — clearer states */}
+      <button
+        onClick={() => sendReport.mutate(lead.id)}
+        disabled={!lead.gamePlayed || sendReport.isPending}
+        title={
+          !lead.gamePlayed
+            ? "No report yet — play the game first"
+            : lead.reportsSentCount
+              ? `Sent ${lead.reportsSentCount} time(s) — click to resend`
+              : "Email the report to this lead"
+        }
+        className={`${btn} disabled:cursor-not-allowed ${
+          !lead.gamePlayed
+            ? "border-gray-100 text-gray-300"
+            : lead.reportsSentCount
+              ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+              : "border-indigo-200 text-indigo-600 hover:bg-indigo-50"
+        }`}
+      >
+        <Mail size={14} /> {!lead.gamePlayed ? "Send" : lead.reportsSentCount ? "Sent" : "Send report"}
+        {!!lead.reportsSentCount && (
+          <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-bold text-white">
+            {lead.reportsSentCount}
+          </span>
+        )}
+      </button>
+
+      {/* Book / reschedule meeting */}
+      <button
+        onClick={() => setMeetingLead(lead)}
+        title={
+          lead.meetingAt
+            ? `Booked: ${new Date(lead.meetingAt).toLocaleString()} — click to reschedule`
+            : "Book a meeting for this lead"
+        }
+        className={`${btn} whitespace-nowrap ${
+          lead.meetingAt
+            ? "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100"
+            : "border-gray-200 text-gray-600 hover:bg-gray-50"
+        }`}
+      >
+        <CalendarClock size={14} />
+        {lead.meetingAt
+          ? new Date(lead.meetingAt).toLocaleString(undefined, {
+              day: "numeric",
+              month: "short",
+              hour: "numeric",
+              minute: "2-digit",
+              hour12: true,
+            })
+          : "Meet"}
+      </button>
+
+      {canDelete && (
+        <button
+          onClick={() => confirmDelete(lead)}
+          disabled={deleteMutation.isPending}
+          title="Delete lead"
+          className="inline-flex items-center rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+        >
+          <Trash2 size={16} />
+        </button>
+      )}
+    </>
+  );
+
   const handleExport = async () => {
     setExporting(true);
     try {
@@ -195,8 +305,8 @@ export function LeadsPage() {
         </select>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white">
+      {/* Table — desktop only; cards below take over on iPad / phones */}
+      <div className="hidden overflow-x-auto rounded-lg border border-gray-200 bg-white lg:block">
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50">
             <tr>
@@ -259,111 +369,49 @@ export function LeadsPage() {
                     {formatDate(lead.createdAt)}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1.5">
-                      {/* Open game — disabled once the game has been played */}
-                      {lead.playToken && !lead.gamePlayed ? (
-                        <a
-                          href={appUrl(`/play/${lead.playToken}`)}
-                          target="_blank"
-                          rel="noreferrer"
-                          title="Open game on this device"
-                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
-                        >
-                          <Gamepad2 size={14} /> Play
-                        </a>
-                      ) : (
-                        <span
-                          title={lead.gamePlayed ? "Game already played" : "No game session"}
-                          className="inline-flex items-center gap-1 rounded-lg border border-gray-100 px-2.5 py-1.5 text-xs font-medium text-gray-300"
-                        >
-                          <Gamepad2 size={14} /> {lead.gamePlayed ? "Played" : "Play"}
-                        </span>
-                      )}
-
-                      {/* Copy the play link to share to the visitor's own phone */}
-                      {lead.playToken && (
-                        <button
-                          onClick={async () => {
-                            try {
-                              await navigator.clipboard.writeText(appUrl(`/play/${lead.playToken}`));
-                              toast.success("Play link copied");
-                            } catch {
-                              toast.error("Couldn't copy — copy it manually from the address bar");
-                            }
-                          }}
-                          title="Copy play link (share to their phone)"
-                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
-                        >
-                          <Copy size={14} /> Link
-                        </button>
-                      )}
-
-                      {/* Send report — only when a game result exists.
-                          Badge shows how many times the report was emailed. */}
-                      <button
-                        onClick={() => sendReport.mutate(lead.id)}
-                        disabled={!lead.gamePlayed || sendReport.isPending}
-                        title={
-                          lead.gamePlayed
-                            ? lead.reportsSentCount
-                              ? `Sent ${lead.reportsSentCount} time(s) — click to resend`
-                              : "Email the report to this lead"
-                            : "No report yet"
-                        }
-                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Mail size={14} /> {lead.reportsSentCount ? "Resend" : "Send"}
-                        {!!lead.reportsSentCount && (
-                          <span className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-100 px-1 text-[10px] font-bold text-emerald-700">
-                            {lead.reportsSentCount}
-                          </span>
-                        )}
-                      </button>
-
-                      {/* Book a meeting — once booked, shows the date/time and
-                          stays clickable so you can view/reschedule it. */}
-                      <button
-                        onClick={() => setMeetingLead(lead)}
-                        title={
-                          lead.meetingAt
-                            ? `Booked: ${new Date(lead.meetingAt).toLocaleString()} — click to reschedule`
-                            : "Book a meeting for this lead"
-                        }
-                        className={`inline-flex items-center gap-1 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-xs font-medium ${
-                          lead.meetingAt
-                            ? "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100"
-                            : "border-gray-200 text-gray-600 hover:bg-gray-50"
-                        }`}
-                      >
-                        <CalendarClock size={14} />
-                        {lead.meetingAt
-                          ? new Date(lead.meetingAt).toLocaleString(undefined, {
-                              day: "numeric",
-                              month: "short",
-                              hour: "numeric",
-                              minute: "2-digit",
-                              hour12: true,
-                            })
-                          : "Meet"}
-                      </button>
-
-                      {canDelete && (
-                        <button
-                          onClick={() => confirmDelete(lead)}
-                          disabled={deleteMutation.isPending}
-                          title="Delete lead"
-                          className="inline-flex items-center rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </div>
+                    <div className="flex items-center justify-end gap-1.5">{leadActions(lead)}</div>
                   </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Card list — used on iPad / phones where the wide table would overflow */}
+      <div className="space-y-3 lg:hidden">
+        {isLoading ? (
+          <p className="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-400">Loading leads…</p>
+        ) : leads.length === 0 ? (
+          <p className="rounded-lg border border-gray-200 bg-white p-6 text-center text-gray-400">No leads match your filters.</p>
+        ) : (
+          leads.map((lead) => (
+            <div key={lead.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <Link to={`/leads/${lead.id}`} className="text-base font-semibold text-indigo-600">
+                  {lead.name || "—"}
+                </Link>
+                <SourceBadge source={lead.source} />
+              </div>
+              {lead.company && <p className="text-sm text-gray-600">{lead.company}</p>}
+              <div className="mt-2 space-y-0.5 text-sm text-gray-600">
+                <div className="break-all">{lead.email || "—"}</div>
+                {lead.phone && <div className="text-xs text-gray-400">{lead.phone}</div>}
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+                {lead.visitorType && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: lead.visitorType.color ?? "#94a3b8" }} />
+                    {lead.visitorType.name}
+                  </span>
+                )}
+                <span>By {lead.submittedByUser?.name ?? "Public (QR)"}</span>
+                <span>{formatDate(lead.createdAt)}</span>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1.5">{leadActions(lead)}</div>
+            </div>
+          ))
+        )}
       </div>
 
       {meetingLead && (

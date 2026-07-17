@@ -168,15 +168,15 @@ function HealthBar({ label, you, comp }: { label: string; you?: number | null; c
   const c = comp ?? 0;
   return (
     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm">
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex min-w-0 items-center justify-end gap-2">
         <span className="font-bold tabular-nums" style={{ color: you == null ? "#9ca3af" : scoreColor(you) }}>{you ?? "–"}</span>
-        <div className="h-2 w-20 overflow-hidden rounded-full bg-gray-100">
+        <div className="h-2 w-full min-w-0 max-w-[80px] flex-1 overflow-hidden rounded-full bg-gray-100">
           <div className="ml-auto h-full rounded-full" style={{ width: `${y}%`, backgroundColor: scoreColor(you), float: "right" }} />
         </div>
       </div>
-      <span className="w-28 text-center text-xs font-medium uppercase tracking-wide text-gray-500">{label}</span>
-      <div className="flex items-center gap-2">
-        <div className="h-2 w-20 overflow-hidden rounded-full bg-gray-100">
+      <span className="w-16 text-center text-[11px] font-medium uppercase tracking-wide text-gray-500 sm:w-28 sm:text-xs">{label}</span>
+      <div className="flex min-w-0 items-center gap-2">
+        <div className="h-2 w-full min-w-0 max-w-[80px] flex-1 overflow-hidden rounded-full bg-gray-100">
           <div className="h-full rounded-full" style={{ width: `${c}%`, backgroundColor: scoreColor(comp) }} />
         </div>
         <span className="font-bold tabular-nums" style={{ color: comp == null ? "#9ca3af" : scoreColor(comp) }}>{comp ?? "–"}</span>
@@ -600,13 +600,13 @@ export function ScoreReport({ data, onBookMeeting }: { data: Comparison; onBookM
           '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
       }}
     >
-      {/* ── Report header — one row: logo left · heading centre · download right ── */}
+      {/* ── Report header — stacks on mobile, one row on md+ ── */}
       <div className="border-b-2 border-gray-900/90 pb-5">
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+        <div className="flex flex-col items-center gap-3 md:grid md:grid-cols-[1fr_auto_1fr] md:items-center md:gap-4">
           {/* Left: logo */}
-          <div className="flex justify-start">
+          <div className="flex justify-center md:justify-start">
             {logoOk ? (
-              <img src={logoSrc} onError={() => setLogoOk(false)} alt="Rath Infotech & Web Solutions Pvt. Ltd." className="h-12 w-auto max-w-[240px] object-contain" />
+              <img src={logoSrc} onError={() => setLogoOk(false)} alt="Rath Infotech & Web Solutions Pvt. Ltd." className="h-11 w-auto max-w-[220px] object-contain sm:h-12" />
             ) : (
               <div className="flex items-center gap-2.5">
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-xl font-black text-white shadow-md ring-1 ring-black/5">
@@ -621,15 +621,15 @@ export function ScoreReport({ data, onBookMeeting }: { data: Comparison; onBookM
           </div>
 
           {/* Centre: heading */}
-          <div className="text-center">
-            <h1 className="flex items-center justify-center gap-2 whitespace-nowrap text-2xl font-black tracking-tight text-gray-900 sm:text-3xl">
-              <Sparkles className="text-indigo-500" size={24} /> AI Visibility Report
+          <div className="min-w-0 text-center">
+            <h1 className="flex items-center justify-center gap-2 text-xl font-black tracking-tight text-gray-900 sm:text-2xl md:text-3xl">
+              <Sparkles className="shrink-0 text-indigo-500" size={22} /> AI Visibility Report
             </h1>
-            <p className="mt-0.5 text-sm font-bold text-gray-700" title={who}>{who}</p>
+            <p className="mt-0.5 truncate text-sm font-bold text-gray-700" title={who}>{who}</p>
           </div>
 
           {/* Right: download */}
-          <div className="flex justify-end">
+          <div className="flex justify-center md:justify-end">
             <button
               onClick={downloadPdf}
               className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 print:hidden"
@@ -691,7 +691,7 @@ export function ScoreReport({ data, onBookMeeting }: { data: Comparison; onBookM
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
           <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-500">Technical health</h3>
           <div className="mb-3 grid grid-cols-[1fr_auto_1fr] text-xs font-semibold uppercase tracking-wide text-gray-400">
-            <span className="text-right">You</span><span className="w-28 text-center">Metric</span><span>Competitor</span>
+            <span className="text-right">You</span><span className="w-16 text-center sm:w-28">Metric</span><span>Partner</span>
           </div>
           <div className="space-y-3">
             <HealthBar label="Performance" you={your.lighthouse?.performance} comp={comp.lighthouse?.performance} />

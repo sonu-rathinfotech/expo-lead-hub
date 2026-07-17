@@ -1,4 +1,5 @@
 import axios from "axios";
+import dns from "dns";
 import { setting, pageSpeedKeys } from "./settings.service";
 
 export interface PageScores {
@@ -27,6 +28,29 @@ export function normalizeUrl(input: string): string {
   const trimmed = input.trim();
   if (!/^https?:\/\//i.test(trimmed)) return `https://${trimmed}`;
   return trimmed;
+}
+
+// Pull the bare hostname out of a (normalized) URL for display / DNS.
+export function hostOf(url: string): string {
+  try {
+    return new URL(normalizeUrl(url)).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+// Does this domain actually exist? A DNS lookup catches clear typos like
+// "flipcart.com" that don't resolve, so we can warn the visitor before wasting
+// a ~60s audit. (A typo that happens to resolve to a parked page can't be
+// caught here — that's on the visitor to eyeball before hitting Start.)
+export async function checkReachable(url: string): Promise<boolean> {
+  try {
+    const host = new URL(normalizeUrl(url)).hostname;
+    await dns.promises.lookup(host);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Free, keyless screenshot fallback for when PageSpeed Insights is unavailable

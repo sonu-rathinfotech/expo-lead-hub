@@ -16,6 +16,9 @@ import {
   LogOut,
   Menu,
   X,
+  PencilLine,
+  ChevronDown,
+  Wrench,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuthStore } from "@/stores/auth.store";
@@ -24,11 +27,17 @@ import clsx from "clsx";
 
 const ADMIN = ["ADMIN", "SUPER_ADMIN"];
 
-const navItems = [
+// Kept flat at the top so the booth sidebar stays simple.
+const primaryItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/leads", label: "Leads", icon: Users },
   { to: "/scan", label: "Capture Lead", icon: ScanLine },
+  { to: "/scan?manual=1", label: "Manual Form", icon: PencilLine },
   { to: "/ai/score", label: "AI Score Game", icon: Gamepad2, roles: ADMIN },
+];
+
+// Admin-only tools, tucked behind a collapsible "Admin Tools" group.
+const toolItems = [
   { to: "/ai/history", label: "Analysis History", icon: Sparkles, roles: ADMIN },
   { to: "/booth", label: "Booth Mode", icon: MonitorPlay, roles: ADMIN },
   { to: "/qr-codes", label: "QR Codes", icon: QrCode, roles: ADMIN },
@@ -36,7 +45,9 @@ const navItems = [
   { to: "/sync", label: "Sync", icon: RefreshCw, roles: ADMIN },
   { to: "/audit", label: "Audit Log", icon: ScrollText, roles: ADMIN },
   { to: "/automation", label: "Automation", icon: Workflow, roles: ADMIN },
-  // { to: "/partnership-calc", label: "Partnership Calc", icon: Calculator, roles: ADMIN },
+];
+
+const bottomItems = [
   { to: "/users", label: "Users", icon: UserCog, roles: ["SUPER_ADMIN"] },
   { to: "/settings", label: "Settings", icon: Settings, owner: true },
 ];
@@ -51,6 +62,41 @@ export function Layout() {
     logout();
     navigate("/login");
   };
+
+  const visible = (item: any) => {
+    if (item.owner) return (user?.email || "").toLowerCase() === OWNER_EMAIL.toLowerCase();
+    return !item.roles || (user && item.roles.includes(user.role));
+  };
+
+  const isActive = (to: string) => {
+    const [path] = to.split("?");
+    if (path === "/") return location.pathname === "/";
+    const pathMatch = location.pathname === path || location.pathname.startsWith(path + "/");
+    // /scan (Capture Lead) vs /scan?manual=1 (Manual Form) — split by the query.
+    if (path === "/scan") {
+      const wantsManual = to.includes("manual=1");
+      return location.pathname === "/scan" && location.search.includes("manual=1") === wantsManual;
+    }
+    return pathMatch;
+  };
+
+  const renderLink = (item: any) => (
+    <Link
+      key={item.to}
+      to={item.to}
+      onClick={() => setSidebarOpen(false)}
+      className={clsx(
+        "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+        isActive(item.to) ? "bg-brand-50 text-brand-700" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
+      )}
+    >
+      <item.icon className="h-5 w-5 flex-shrink-0" />
+      {item.label}
+    </Link>
+  );
+
+  const tools = toolItems.filter(visible);
+  const [toolsOpen, setToolsOpen] = useState(() => tools.some((t) => location.pathname.startsWith(t.to)));
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
@@ -76,34 +122,25 @@ export function Layout() {
           <span className="text-lg font-bold text-gray-900">ELC</span>
         </div>
 
-        <nav className="flex-1 space-y-1 px-3 py-4">
-          {navItems
-            .filter((item: any) => {
-              if (item.owner) return (user?.email || "").toLowerCase() === OWNER_EMAIL.toLowerCase();
-              return !item.roles || (user && item.roles.includes(user.role));
-            })
-            .map((item) => {
-            const isActive =
-              item.to === "/"
-                ? location.pathname === "/"
-                : location.pathname === item.to || location.pathname.startsWith(item.to + "/");
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                onClick={() => setSidebarOpen(false)}
-                className={clsx(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-brand-50 text-brand-700"
-                    : "text-gray-600 hover:bg-gray-50 hover:text-gray-900",
-                )}
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+          {primaryItems.filter(visible).map(renderLink)}
+
+          {/* Admin Tools — collapsed by default to keep the booth sidebar simple */}
+          {tools.length > 0 && (
+            <div className="pt-1">
+              <button
+                onClick={() => setToolsOpen((o) => !o)}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
               >
-                <item.icon className="h-5 w-5 flex-shrink-0" />
-                {item.label}
-              </Link>
-            );
-          })}
+                <Wrench className="h-5 w-5 flex-shrink-0" />
+                <span className="flex-1 text-left">Admin Tools</span>
+                <ChevronDown className={clsx("h-4 w-4 transition-transform", toolsOpen && "rotate-180")} />
+              </button>
+              {toolsOpen && <div className="mt-1 space-y-1 border-l border-gray-100 pl-3">{tools.map(renderLink)}</div>}
+            </div>
+          )}
+
+          {bottomItems.filter(visible).map(renderLink)}
         </nav>
 
         <div className="border-t border-gray-200 p-4">

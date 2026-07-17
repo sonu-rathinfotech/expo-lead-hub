@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Mail,
@@ -285,6 +285,15 @@ export function AutomationPage() {
   });
 
   const events: { id: string; name: string }[] = eventsQuery.data?.events ?? [];
+
+  // Default the selector to MMD 2026 (or the first event) once events load.
+  useEffect(() => {
+    if (!eventId && events.length) {
+      const mmd = events.find((e) => /mmd\s*2026/i.test(e.name));
+      setEventId(mmd?.id ?? events[0]!.id);
+    }
+  }, [events, eventId]);
+
   const configs: NConfig[] = notificationsQuery.data?.configs ?? [];
   const waConfig = configs.find((c) => c.channel === "WHATSAPP") ?? null;
   const emailConfig = configs.find((c) => c.channel === "EMAIL") ?? null;

@@ -46,3 +46,41 @@ export interface ReportVars {
 export function buildReportEmail(vars: ReportVars): string {
   return withSignature(render(settingWithDefault("EMAIL_REPORT_TEMPLATE"), vars));
 }
+
+export interface MeetingVars {
+  [k: string]: string;
+  name: string;
+  company: string;
+  datetime: string;
+}
+
+// Visitor-facing meeting confirmation — uses the meeting template + its OWN
+// signature (distinct from the report signature).
+export function buildMeetingEmail(vars: MeetingVars): string {
+  const body = render(settingWithDefault("EMAIL_MEETING_TEMPLATE"), vars).trim();
+  return `${body}\n\n${settingWithDefault("EMAIL_MEETING_SIGNATURE")}`;
+}
+
+// Internal "new meeting booked" notification (to the sales inbox).
+export function buildMeetingNotice(v: {
+  name: string;
+  company: string;
+  email: string;
+  phone: string;
+  datetime: string;
+  note: string;
+  event?: string;
+}): string {
+  const lines = [
+    "New meeting booked from the booth 🎉",
+    "",
+    `When:     ${v.datetime}`,
+    `Name:     ${v.name || "—"}`,
+    `Company:  ${v.company || "—"}`,
+    `Email:    ${v.email || "—"}`,
+    `Phone:    ${v.phone || "—"}`,
+  ];
+  if (v.event) lines.push(`Event:    ${v.event}`);
+  if (v.note) lines.push("", `Note: ${v.note}`);
+  return lines.join("\n");
+}

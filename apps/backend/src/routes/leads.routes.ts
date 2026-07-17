@@ -1,10 +1,12 @@
 import { Router, Request, Response } from "express";
+import { z } from "zod";
 import { prisma } from "@elc/db";
 import { LEAD_FORM_FIELDS } from "@elc/shared";
 import { authenticate, requireRole } from "../middleware/auth";
 import { AppError } from "../middleware/error-handler";
 import { asyncHandler } from "../utils/async-handler";
 import { sendReportsForLead } from "../services/report-email.service";
+import { bookMeeting } from "../services/meeting.service";
 
 const router = Router();
 router.use(authenticate);
@@ -94,6 +96,7 @@ router.get(
           sheetsSynced: true,
           rawFormData: true,
           playToken: true,
+          meetingAt: true,
           createdAt: true,
           event: { select: { id: true, name: true } },
           booth: { select: { id: true, name: true } },
@@ -133,6 +136,7 @@ router.get(
         playToken: l.playToken,
         gamePlayed: l.playToken ? playedSet.has(l.playToken) : false,
         reportsSentCount: l.reportsSentCount,
+        meetingAt: l.meetingAt,
         ...summarize(l.rawFormData),
       })),
       total,
@@ -264,11 +268,32 @@ router.post(
   }),
 );
 
-// ── DELETE /api/leads/:id (Admin — remove a lead) ──
+// ── POST /api/leads/:id/meeting (Staff books a meeting for a lead) ──
+const meetingBodySchema = z.object({
+  date: z.string().min(8),
+  time: z.string().min(3),
+  note: z.string().max(500).optional(),
+});
+router.post(
+  "/:id/meeting",
+  asyncHandler(async (req: Request, res: Response) => {
+    const id = String(req.params.id);
+    const { date, time, note } = meetingBodySchema.parse(req.body);
+    const lead = await prisma.lead.findUnique({
+      where: { id },
+      select: { id: true, rawFormData: true, event: { select: { name: true } } },
+    });
+    if (!lead) throw new AppError(404, "Lead not found");
+    const r = await bookMeeting(lead, date, time, note);
+    res.json({ ok: true, ...r });
+  }),
+);
+
+// ── DELETE /api/leads/:id (Super Admin only — remove a lead) ──
 // Cascades to its sync queue + logs (FK onDelete: Cascade).
 router.delete(
   "/:id",
-  requireRole("SUPER_ADMIN", "ADMIN"),
+  requireRole("SUPER_ADMIN"),
   asyncHandler(async (req: Request, res: Response) => {
     const id = String(req.params.id);
     const existing = await prisma.lead.findUnique({ where: { id }, select: { id: true } });

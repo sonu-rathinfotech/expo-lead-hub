@@ -5,7 +5,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   DATABASE_URL: z.string().url(),
   JWT_SECRET: z.string().min(16),
-  JWT_ACCESS_EXPIRY: z.string().default("15m"),
+  JWT_ACCESS_EXPIRY: z.string().default("1d"), // booth day — one login lasts all day
   JWT_REFRESH_EXPIRY: z.string().default("7d"),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   // Public base URL of the frontend (used to build visitor "extra links",

@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Loader2, Sparkles, Calculator, ArrowRight } from "lucide-react";
+import { AlertTriangle, Loader2, Sparkles, Calculator, ArrowRight, CalendarClock } from "lucide-react";
 import { publicApi } from "../lib/api-client";
+import { MeetingModal } from "../components/MeetingModal";
 
 interface Game {
   type: "AI_SCORE" | "PROFIT_CALC";
@@ -37,6 +39,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 export function PlaySelect() {
   const { token } = useParams<{ token: string }>();
+  const [showMeeting, setShowMeeting] = useState(false);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["play-session", token],
@@ -124,7 +127,19 @@ export function PlaySelect() {
         })}
       </div>
 
-      <p className="mt-8 text-center text-xs text-slate-500">Powered by Rath Infotech · {data.event.name}</p>
+      {/* Book a meeting — for visitors who want to talk after playing */}
+      <div className="mt-6 text-center">
+        <button
+          onClick={() => setShowMeeting(true)}
+          className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+        >
+          <CalendarClock size={18} className="text-indigo-300" /> Want to talk? Book a meeting
+        </button>
+      </div>
+
+      <p className="mt-6 text-center text-xs text-slate-500">Powered by Rath Infotech · {data.event.name}</p>
+
+      {showMeeting && <MeetingModal token={data.token} name={firstName} onClose={() => setShowMeeting(false)} />}
     </Shell>
   );
 }

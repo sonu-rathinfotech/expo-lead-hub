@@ -9,12 +9,13 @@ import { notifyLeadReceived } from "../services/notification.service";
 import { newPlayToken, playLink } from "../utils/play-link";
 import { searchBni, lookupBniByPhone } from "../services/bni-cache.service";
 import { parseCardWithAI } from "../services/card-parser.service";
-import { normalizeUrl } from "../services/page-analyzer.service";
+import { normalizeUrl, checkReachable, hostOf } from "../services/page-analyzer.service";
 import { enqueueAnalysis, queueInfo } from "../services/analysis-queue.service";
 import { computeProfit, inr } from "../services/profit-calc.service";
 import { emailService } from "../services/email.service";
 import { buildCalcEmail } from "../services/email-templates.service";
 import { synthesizeSpeech } from "../services/tts.service";
+import { bookMeeting } from "../services/meeting.service";
 
 const router = Router();
 
@@ -499,6 +500,15 @@ router.post(
     const competitor = normalizeUrl(p.competitorUrl);
     const competitor2 = p.competitorUrl2 ? normalizeUrl(p.competitorUrl2) : undefined;
 
+    // Catch typo'd / non-existent domains (e.g. "flipcart.com") up front so we
+    // don't run a 60s audit against a site that doesn't exist.
+    const toCheck = [target, competitor, ...(competitor2 ? [competitor2] : [])];
+    const reach = await Promise.all(toCheck.map((u) => checkReachable(u)));
+    const unreachable = toCheck.filter((_, i) => !reach[i]).map((u) => hostOf(u));
+    if (unreachable.length) {
+      throw new AppError(400, `We couldn't reach ${unreachable.join(" and ")}. Please check the spelling.`);
+    }
+
     // Attribute to the visitor's event/booth + recover their email from the lead.
     let eventId: string | null = null;
     let boothId: string | null = null;
@@ -745,6 +755,30 @@ router.get(
       calcItems,
       leaderboard: { scores: scoreBoard, margins: marginBoard },
     });
+  }),
+);
+
+// ── POST /api/public/meeting (Book a follow-up meeting after the game) ──
+// No auth — the play token is the capability.
+const meetingSchema = z.object({
+  playToken: z.string().min(3),
+  date: z.string().min(8), // YYYY-MM-DD
+  time: z.string().min(3), // HH:MM
+  note: z.string().max(500).optional(),
+});
+
+router.post(
+  "/meeting",
+  asyncHandler(async (req: Request, res: Response) => {
+    const { playToken, date, time, note } = meetingSchema.parse(req.body);
+    const lead = await prisma.lead.findUnique({
+      where: { playToken },
+      select: { id: true, rawFormData: true, event: { select: { name: true } } },
+    });
+    if (!lead) throw new AppError(404, "This session was not found.");
+
+    const r = await bookMeeting(lead, date, time, note);
+    res.json({ ok: true, ...r });
   }),
 );
 

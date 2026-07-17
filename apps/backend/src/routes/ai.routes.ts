@@ -4,7 +4,7 @@ import { prisma } from "@elc/db";
 import { authenticate } from "../middleware/auth";
 import { AppError } from "../middleware/error-handler";
 import { asyncHandler } from "../utils/async-handler";
-import { normalizeUrl } from "../services/page-analyzer.service";
+import { normalizeUrl, checkReachable, hostOf } from "../services/page-analyzer.service";
 import { enqueueAnalysis, queueInfo } from "../services/analysis-queue.service";
 import { searchBni } from "../services/bni-cache.service";
 
@@ -77,6 +77,14 @@ router.post(
     const target = normalizeUrl(url);
     const competitor = normalizeUrl(competitorUrl);
     const competitor2 = competitorUrl2 ? normalizeUrl(competitorUrl2) : undefined;
+
+    // Catch typo'd / non-existent domains before running a 60s audit.
+    const toCheck = [target, competitor, ...(competitor2 ? [competitor2] : [])];
+    const reach = await Promise.all(toCheck.map((u) => checkReachable(u)));
+    const unreachable = toCheck.filter((_, i) => !reach[i]).map((u) => hostOf(u));
+    if (unreachable.length) {
+      throw new AppError(400, `We couldn't reach ${unreachable.join(" and ")}. Please check the spelling.`);
+    }
 
     const analysis = await prisma.websiteAnalysis.create({
       data: {

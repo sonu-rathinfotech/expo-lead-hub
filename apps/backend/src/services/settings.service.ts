@@ -18,7 +18,7 @@ export interface SettingDef {
 
 // Default email copy — editable from the portal, stored in the DB when changed.
 export const DEFAULT_SIGNATURE =
-  "Akshay Narvekar\nRath Infotech and Web Solutions\nsales@rathinfotech.com\n+91 727 727 1 727\nrathinfotech.com";
+  "Rath Infotech and Web Solutions Pvt Ltd\n7277271727\nsales@rathinfotech.com";
 
 export const DEFAULT_CALC_TEMPLATE = `Hi,
 
@@ -49,10 +49,26 @@ Ranking keywords: {keywords}   Est. organic traffic: {traffic}
 
 See the full report: {reportLink}`;
 
+// Meeting confirmation email — its own copy + signature (distinct from reports).
+export const DEFAULT_MEETING_TEMPLATE = `Hi {name},
+
+Thank you for visiting Rath Infotech at MMD 2026! Your meeting is confirmed:
+
+🗓  {datetime}
+
+We're looking forward to discussing how we can help {company} grow online. If you need to reschedule, just reply to this email and we'll sort it out.
+
+See you soon!`;
+
+export const DEFAULT_MEETING_SIGNATURE =
+  "Team Rath Infotech\nRath Infotech and Web Solutions Pvt Ltd\n7277271727\nsales@rathinfotech.com";
+
 const DEFAULTS: Record<string, string> = {
   EMAIL_SIGNATURE: DEFAULT_SIGNATURE,
   EMAIL_CALC_TEMPLATE: DEFAULT_CALC_TEMPLATE,
   EMAIL_REPORT_TEMPLATE: DEFAULT_REPORT_TEMPLATE,
+  EMAIL_MEETING_TEMPLATE: DEFAULT_MEETING_TEMPLATE,
+  EMAIL_MEETING_SIGNATURE: DEFAULT_MEETING_SIGNATURE,
   AI_VOICE_PROVIDER: "browser",
   GEMINI_TTS_VOICE: "Kore",
 };
@@ -112,6 +128,26 @@ export const SETTINGS: SettingDef[] = [
     group: "Email templates",
     type: "textarea",
     hint: "Placeholders: {yourScore} {competitorScore} {reasoning} {da} {pa} {referringDomains} {backlinks} {keywords} {traffic} {reportLink}. The signature is added automatically.",
+  },
+  {
+    key: "MEETING_NOTIFY_EMAIL",
+    label: "Meeting alerts go to (internal)",
+    group: "Meeting emails",
+    hint: "Where the internal 'new meeting booked' copy is sent. Defaults to sales@rathinfotech.com.",
+  },
+  {
+    key: "EMAIL_MEETING_TEMPLATE",
+    label: "Meeting confirmation email (to the visitor)",
+    group: "Meeting emails",
+    type: "textarea",
+    hint: "Placeholders: {name} {company} {datetime}. The meeting signature below is added automatically.",
+  },
+  {
+    key: "EMAIL_MEETING_SIGNATURE",
+    label: "Meeting email signature",
+    group: "Meeting emails",
+    type: "textarea",
+    hint: "Sign-off for meeting emails (separate from the report signature).",
   },
 ];
 const MANAGED = new Set(SETTINGS.map((s) => s.key));

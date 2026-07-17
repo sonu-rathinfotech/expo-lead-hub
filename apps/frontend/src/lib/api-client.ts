@@ -86,6 +86,8 @@ export const publicApi = {
   // Public AI Score game (queue a comparison; poll via getAnalysis)
   submitScore: (data: unknown) => publicClient.post("/public/score", data),
   tts: (text: string) => publicClient.post("/public/tts", { text }),
+  bookMeeting: (data: { playToken: string; date: string; time: string; note?: string }) =>
+    publicClient.post("/public/meeting", data),
   // Public Profitability Calculator (compute + email results)
   submitCalculator: (data: unknown) => publicClient.post("/public/calculator", data),
   // Booth TV / stall display feed
@@ -232,6 +234,8 @@ export const api = {
       getApiClient().post("/leads/export", filters ?? {}, { responseType: "blob" }),
     remove: (id: string) => getApiClient().delete(`/leads/${id}`),
     sendReport: (id: string) => getApiClient().post(`/leads/${id}/send-report`),
+    bookMeeting: (id: string, data: { date: string; time: string; note?: string }) =>
+      getApiClient().post(`/leads/${id}/meeting`, data),
   },
 
   // Audit Logs

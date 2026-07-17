@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Sparkles, Loader2, ArrowLeft } from "lucide-react";
+import { Sparkles, Loader2, ArrowLeft, CalendarClock } from "lucide-react";
 import { publicApi } from "../lib/api-client";
 import { AuditProgress } from "../components/AuditProgress";
 import { ScoreReport, type Comparison } from "../components/ScoreReport";
 import { FindEntry } from "../components/FindEntry";
+import { MeetingModal } from "../components/MeetingModal";
 import { unlockAudio } from "../lib/audio";
 
 interface PlaySession {
@@ -27,6 +28,7 @@ export function PublicScoreGame() {
   const [email, setEmail] = useState("");
   const [linkedToken, setLinkedToken] = useState<string | null>(null);
   const [linkedName, setLinkedName] = useState("");
+  const [showMeeting, setShowMeeting] = useState(false);
   const effToken = token || linkedToken;
 
   const session = useQuery({
@@ -97,7 +99,15 @@ export function PublicScoreGame() {
       <div className="min-h-screen bg-slate-50 p-4">
         <div className="mx-auto max-w-4xl">
           <ScoreReport data={analysis} />
-          <div className="mt-6 text-center print:hidden">
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 print:hidden">
+            {effToken && (
+              <button
+                onClick={() => setShowMeeting(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
+              >
+                <CalendarClock size={16} /> Book a meeting
+              </button>
+            )}
             <button
               onClick={() => {
                 setAnalysis(null);
@@ -110,6 +120,9 @@ export function PublicScoreGame() {
             </button>
           </div>
         </div>
+        {showMeeting && effToken && (
+          <MeetingModal token={effToken} name={linkedName || undefined} onClose={() => setShowMeeting(false)} />
+        )}
       </div>
     );
   }

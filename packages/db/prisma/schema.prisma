@@ -294,6 +294,7 @@ model Lead {
   crmResponse         Json?      @map("crm_response")
   sheetsSynced        Boolean    @default(false) @map("sheets_synced")
   reportsSentCount    Int        @default(0) @map("reports_sent_count") // times the result email was sent
+  meetingAt           DateTime?  @map("meeting_at") // booked follow-up meeting
   status              LeadStatus @default(NEW)
   createdAt           DateTime   @default(now()) @map("created_at")
   updatedAt           DateTime   @updatedAt @map("updated_at")

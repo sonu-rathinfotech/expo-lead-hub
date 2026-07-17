@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Download, Search, Loader2, Trash2, Gamepad2, Mail, Copy } from "lucide-react";
+import { Download, Search, Loader2, Trash2, Gamepad2, Mail, Copy, CalendarClock } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../lib/api-client";
 import { appUrl } from "../lib/app-url";
 import { useAuthStore } from "../stores/auth.store";
-import { LeadStatusBadge, SourceBadge, formatDate } from "../components/badges";
+import { SourceBadge, formatDate } from "../components/badges";
+import { MeetingModal } from "../components/MeetingModal";
 
 const PAGE_SIZE = 20;
 const SOURCES = ["QR_SCAN", "OCR_SCAN", "MANUAL"];
@@ -28,12 +29,13 @@ interface LeadRow {
   playToken?: string | null;
   gamePlayed?: boolean;
   reportsSentCount?: number;
+  meetingAt?: string | null;
 }
 
 export function LeadsPage() {
   const qc = useQueryClient();
   const role = useAuthStore((s) => s.user?.role);
-  const canDelete = role === "ADMIN" || role === "SUPER_ADMIN";
+  const canDelete = role === "SUPER_ADMIN";
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -41,6 +43,7 @@ export function LeadsPage() {
   const [source, setSource] = useState("");
   const [status, setStatus] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [meetingLead, setMeetingLead] = useState<LeadRow | null>(null);
 
   const filters = {
     ...(eventId ? { eventId } : {}),
@@ -197,7 +200,7 @@ export function LeadsPage() {
         <table className="min-w-full divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50">
             <tr>
-              {["Name", "Company", "Contact", "Event", "Visitor Type", "Captured by", "Source", "Status", "Date"].map((h) => (
+              {["Name", "Company", "Contact", "Visitor Type", "Captured by", "Source", "Date"].map((h) => (
                 <th key={h} className="px-4 py-3 text-left font-semibold text-gray-600">
                   {h}
                 </th>
@@ -208,13 +211,13 @@ export function LeadsPage() {
           <tbody className="divide-y divide-gray-100">
             {isLoading ? (
               <tr>
-                <td colSpan={10} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
                   Loading leads…
                 </td>
               </tr>
             ) : leads.length === 0 ? (
               <tr>
-                <td colSpan={10} className="px-4 py-10 text-center text-gray-400">
+                <td colSpan={8} className="px-4 py-10 text-center text-gray-400">
                   No leads match your filters.
                 </td>
               </tr>
@@ -231,7 +234,6 @@ export function LeadsPage() {
                     <div>{lead.email || "—"}</div>
                     <div className="text-xs text-gray-400">{lead.phone}</div>
                   </td>
-                  <td className="px-4 py-3 text-gray-700">{lead.event?.name ?? "—"}</td>
                   <td className="px-4 py-3">
                     {lead.visitorType ? (
                       <span
@@ -253,14 +255,11 @@ export function LeadsPage() {
                   <td className="px-4 py-3">
                     <SourceBadge source={lead.source} />
                   </td>
-                  <td className="px-4 py-3">
-                    <LeadStatusBadge status={lead.status} />
-                  </td>
                   <td className="px-4 py-3 whitespace-nowrap text-gray-500">
                     {formatDate(lead.createdAt)}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="flex items-center justify-end gap-1.5">
                       {/* Open game — disabled once the game has been played */}
                       {lead.playToken && !lead.gamePlayed ? (
                         <a
@@ -268,14 +267,14 @@ export function LeadsPage() {
                           target="_blank"
                           rel="noreferrer"
                           title="Open game on this device"
-                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
                         >
                           <Gamepad2 size={14} /> Play
                         </a>
                       ) : (
                         <span
                           title={lead.gamePlayed ? "Game already played" : "No game session"}
-                          className="inline-flex items-center gap-1 rounded-lg border border-gray-100 px-2 py-1 text-xs font-medium text-gray-300"
+                          className="inline-flex items-center gap-1 rounded-lg border border-gray-100 px-2.5 py-1.5 text-xs font-medium text-gray-300"
                         >
                           <Gamepad2 size={14} /> {lead.gamePlayed ? "Played" : "Play"}
                         </span>
@@ -293,7 +292,7 @@ export function LeadsPage() {
                             }
                           }}
                           title="Copy play link (share to their phone)"
-                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50"
+                          className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
                         >
                           <Copy size={14} /> Link
                         </button>
@@ -311,7 +310,7 @@ export function LeadsPage() {
                               : "Email the report to this lead"
                             : "No report yet"
                         }
-                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         <Mail size={14} /> {lead.reportsSentCount ? "Resend" : "Send"}
                         {!!lead.reportsSentCount && (
@@ -319,6 +318,33 @@ export function LeadsPage() {
                             {lead.reportsSentCount}
                           </span>
                         )}
+                      </button>
+
+                      {/* Book a meeting — once booked, shows the date/time and
+                          stays clickable so you can view/reschedule it. */}
+                      <button
+                        onClick={() => setMeetingLead(lead)}
+                        title={
+                          lead.meetingAt
+                            ? `Booked: ${new Date(lead.meetingAt).toLocaleString()} — click to reschedule`
+                            : "Book a meeting for this lead"
+                        }
+                        className={`inline-flex items-center gap-1 whitespace-nowrap rounded-lg border px-2.5 py-1.5 text-xs font-medium ${
+                          lead.meetingAt
+                            ? "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100"
+                            : "border-gray-200 text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        <CalendarClock size={14} />
+                        {lead.meetingAt
+                          ? new Date(lead.meetingAt).toLocaleString(undefined, {
+                              day: "numeric",
+                              month: "short",
+                              hour: "numeric",
+                              minute: "2-digit",
+                              hour12: true,
+                            })
+                          : "Meet"}
                       </button>
 
                       {canDelete && (
@@ -339,6 +365,16 @@ export function LeadsPage() {
           </tbody>
         </table>
       </div>
+
+      {meetingLead && (
+        <MeetingModal
+          leadId={meetingLead.id}
+          name={meetingLead.name || undefined}
+          currentMeetingAt={meetingLead.meetingAt}
+          onClose={() => setMeetingLead(null)}
+          onBooked={() => qc.invalidateQueries({ queryKey: ["leads"] })}
+        />
+      )}
 
       {/* Pagination */}
       <div className="flex items-center justify-between">

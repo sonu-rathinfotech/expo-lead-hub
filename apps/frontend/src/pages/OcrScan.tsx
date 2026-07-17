@@ -6,6 +6,7 @@ import { api } from "../lib/api-client";
 import { downscale } from "../lib/ocr";
 import { useAuthStore } from "../stores/auth.store";
 import { DynamicForm, type FormFieldDef } from "../components/DynamicForm";
+import { useSearchParams } from "react-router-dom";
 import { appUrl } from "../lib/app-url";
 
 interface ParsedData {
@@ -47,6 +48,8 @@ const DEFAULT_MANUAL_FIELDS: FormFieldDef[] = [
 
 export function OcrScanPage() {
   const user = useAuthStore((s) => s.user);
+  const [params] = useSearchParams();
+  const startManual = params.get("manual") === "1";
   const [eventId, setEventId] = useState("");
   const [boothId, setBoothId] = useState("");
   const [visitorTypeId, setVisitorTypeId] = useState("");
@@ -58,7 +61,7 @@ export function OcrScanPage() {
   const [done, setDone] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [playToken, setPlayToken] = useState<string | null>(null);
-  const [manual, setManual] = useState(false); // staff typing the lead by hand (no scan)
+  const [manual, setManual] = useState(startManual); // staff typing the lead by hand (no scan)
 
   const { data: eventsData } = useQuery({
     queryKey: ["events-filter"],

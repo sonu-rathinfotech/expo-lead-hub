@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Sparkles, Loader2, ArrowLeft, CalendarClock } from "lucide-react";
+import { Sparkles, Loader2, ArrowLeft } from "lucide-react";
 import { publicApi } from "../lib/api-client";
 import { AuditProgress } from "../components/AuditProgress";
 import { ScoreReport, type Comparison } from "../components/ScoreReport";
@@ -98,16 +98,8 @@ export function PublicScoreGame() {
     return (
       <div className="min-h-screen bg-slate-50 p-4">
         <div className="mx-auto max-w-4xl">
-          <ScoreReport data={analysis} />
+          <ScoreReport data={analysis} onBookMeeting={effToken ? () => setShowMeeting(true) : undefined} />
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3 print:hidden">
-            {effToken && (
-              <button
-                onClick={() => setShowMeeting(true)}
-                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700"
-              >
-                <CalendarClock size={16} /> Book a meeting
-              </button>
-            )}
             <button
               onClick={() => {
                 setAnalysis(null);

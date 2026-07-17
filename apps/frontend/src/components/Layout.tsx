@@ -35,13 +35,13 @@ const primaryItems = [
   { to: "/leads", label: "Data", icon: Users },
   { to: "/scan", label: "Capture Lead", icon: ScanLine },
   { to: "/scan?manual=1", label: "Manual Form", icon: PencilLine },
-  { to: "/ai/score", label: "AI Score Game", icon: Gamepad2, roles: ADMIN },
+  { to: "/booth", label: "Booth Mode", icon: MonitorPlay, roles: ADMIN },
 ];
 
 // Admin-only tools, tucked behind a collapsible "Admin Tools" group.
 const toolItems = [
+  { to: "/ai/score", label: "AI Score Game", icon: Gamepad2, roles: ADMIN },
   { to: "/ai/history", label: "Analysis History", icon: Sparkles, roles: ADMIN },
-  { to: "/booth", label: "Booth Mode", icon: MonitorPlay, roles: ADMIN },
   { to: "/qr-codes", label: "QR Codes", icon: QrCode, roles: ADMIN },
   { to: "/forms", label: "Form Builder", icon: FileText, roles: ADMIN },
   { to: "/sync", label: "Sync", icon: RefreshCw, roles: ADMIN },

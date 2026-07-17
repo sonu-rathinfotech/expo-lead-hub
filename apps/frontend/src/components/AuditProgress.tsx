@@ -39,10 +39,14 @@ function pickVoice(): SpeechSynthesisVoice | null {
 const RIGHT_WORDS = [
   "SEO", "SPEED", "UX", "MOBILE", "CTA", "SCHEMA", "H1 TAGS", "META", "HTTPS", "SITEMAP",
   "CANONICAL", "LCP", "ALT TAGS", "PAGESPEED", "INDEXING", "CONTENT", "INTERNAL LINKS", "RICH SNIPPETS", "CORE VITALS", "A11Y",
+  // AI-visibility signals
+  "LLMS.TXT", "GPTBOT", "JSON-LD", "AI READY", "GEO", "ENTITY", "STRUCTURED DATA", "CITATIONS",
 ];
 const LEFT_WORDS = [
   "BACKLINKS", "DESIGN", "KEYWORDS", "DOMAIN RANK", "TRAFFIC", "RANKING", "AUTHORITY", "CONVERSION", "BOUNCE RATE", "DWELL TIME",
   "CRAWL", "OG TAGS", "CDN", "CACHE", "REDIRECTS", "404 FIXES", "ANCHOR TEXT", "SERP", "ROBOTS.TXT", "AMP",
+  // AI-visibility signals
+  "CLAUDEBOT", "PERPLEXITY", "GOOGLE-EXT", "SCHEMA.ORG", "AEO", "AI SEARCH", "SAMEAS", "KNOWLEDGE",
 ];
 
 // Full-screen, video-like "audit in progress" scene with live voice narration.
@@ -64,13 +68,17 @@ export function AuditProgress({
   const messages = [
     `Capturing ${host(yourUrl)}…`,
     competitorUrl ? `Capturing ${host(competitorUrl)}…` : "Capturing partners…",
-    "Measuring domain authority & backlinks…",
-    "Analyzing your ranking keywords…",
+    // AI-visibility signal checks (now backed by real fetches)
+    "Scanning llms.txt…",
+    "Testing GPTBot / ClaudeBot access…",
+    "Reading structured data & schema…",
+    "Checking entity recognition…",
+    // existing signals, kept
     "Checking speed & Core Web Vitals…",
-    "Scoring design, UX & conversion…",
-    "Checking AI-search visibility…",
-    "Comparing head-to-head…",
-    "Building your report…",
+    "Scoring AI-search visibility…",
+    "Measuring content structure…",
+    "Comparing AI visibility head-to-head…",
+    "Building your AI Visibility report…",
   ];
   // Shown on a loop once the main steps are done, so the scene keeps feeling
   // alive for the full ~50–70s the audit can take (instead of freezing).
@@ -96,12 +104,13 @@ export function AuditProgress({
   useEffect(() => {
     if (muted) return;
     const name = company?.trim() ? company.trim() : "there";
-    const comp = competitorUrl ? host(competitorUrl) : "your partner";
     const segments = [
-      { at: 0, text: `Hey ${name}! Let's see how you stack up against ${comp}. Starting your audit now.` },
-      { at: 17000, text: "Still analyzing — measuring your S E O, page speed and design." },
-      { at: 34000, text: "The audit is still running. Comparing both sites head to head." },
-      { at: 50000, text: "Almost done — putting your report together." },
+      // Line 1 is a warm ~12-word welcome by name; the A I theme comes right
+      // after the greeting, then the rest of the audit follows.
+      { at: 0, text: `Welcome ${name}! Great to have you here — let's check how visible you are to A I.` },
+      { at: 17000, text: "Still analyzing — checking your l l m s dot txt, A I crawler access and structured data." },
+      { at: 34000, text: "The audit is still running. Comparing both sites' A I visibility head to head." },
+      { at: 50000, text: "Almost done — putting your A I Visibility report together." },
     ];
 
     let cancelled = false;
@@ -247,8 +256,11 @@ export function AuditProgress({
       </div>
 
       <h2 className="text-2xl font-black tracking-tight sm:text-3xl">
-        {company?.trim() ? `Hey ${company.trim()},` : "Hang tight,"} your audit is running
+        {company?.trim() ? `Welcome, ${company.trim()}!` : "Welcome!"}
       </h2>
+      <p className="mt-2 max-w-xl text-base font-medium text-indigo-100/90">
+        Great to have you here — let's see how visible your website is to AI.
+      </p>
       <p className="mt-3 flex items-center justify-center gap-2 text-lg text-indigo-200">
         <span className="relative flex h-2.5 w-2.5">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400" />
@@ -282,7 +294,7 @@ export function AuditProgress({
       )}
 
       <p className="mt-8 max-w-md text-sm text-white/40">
-        This usually takes about a minute — we're capturing both sites and scoring them with AI.
+        This usually takes about a minute — we're capturing both sites and scoring their AI visibility.
       </p>
 
       <style>{`

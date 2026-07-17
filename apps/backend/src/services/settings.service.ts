@@ -71,6 +71,7 @@ const DEFAULTS: Record<string, string> = {
   EMAIL_MEETING_SIGNATURE: DEFAULT_MEETING_SIGNATURE,
   AI_VOICE_PROVIDER: "browser",
   GEMINI_TTS_VOICE: "Kore",
+  DATAFORSEO_AI_MENTIONS: "on",
 };
 
 // The integration credentials that can be managed from the portal.
@@ -89,6 +90,14 @@ export const SETTINGS: SettingDef[] = [
   { key: "SEO_PROVIDER", label: "SEO provider", group: "DataForSEO (DA / PA / keywords)", type: "select", options: ["auto", "dataforseo", "pagespeed"] },
   { key: "DATAFORSEO_LOCATION_CODE", label: "Market location code (2356 = India)", group: "DataForSEO (DA / PA / keywords)" },
   { key: "DATAFORSEO_LANGUAGE_CODE", label: "Language code", group: "DataForSEO (DA / PA / keywords)" },
+  {
+    key: "DATAFORSEO_AI_MENTIONS",
+    label: "AI citation check (LLM Mentions)",
+    group: "DataForSEO (DA / PA / keywords)",
+    type: "select",
+    options: ["on", "off"],
+    hint: "Paid ~$0.40 per audit. Shows in the report whether you're cited by ChatGPT & Google AI Overview vs your competitor. Needs DataForSEO login/password above.",
+  },
   { key: "RESEND_API_KEY", label: "Resend API key", group: "Email (Resend)", secret: true },
   { key: "EMAIL_FROM", label: "From address", group: "Email (Resend)" },
   { key: "OPENWA_BASE_URL", label: "OpenWA base URL", group: "WhatsApp (OpenWA)" },

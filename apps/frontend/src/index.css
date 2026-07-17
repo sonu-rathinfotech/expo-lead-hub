@@ -13,6 +13,7 @@
   @page {
     margin: 12mm;
   }
+  html,
   body {
     background: #fff !important;
   }
@@ -23,6 +24,18 @@
   /* Keep each report card whole — don't split a card across two pages. */
   [data-report] > * {
     break-inside: avoid;
+  }
+  /* On white paper a white card with a faint border disappears — give every
+     report card a solid visible border and drop screen-only shadows. */
+  [data-report] .rounded-2xl,
+  [data-report] .rounded-xl {
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+  }
+  /* Screenshots can be very tall — cap them so they don't create blank pages. */
+  [data-report] img {
+    max-height: 280px !important;
+    object-fit: contain !important;
   }
 }
 

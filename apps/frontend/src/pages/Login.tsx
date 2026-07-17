@@ -51,7 +51,7 @@ export function LoginPage() {
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-xl font-bold text-white shadow-lg">
             E
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-gray-900">Exhibition Lead Capture</h1>
+          <h1 className="mt-4 text-2xl font-bold text-gray-900">MMD 2026</h1>
           <p className="mt-1 text-sm text-gray-500">Sign in to your admin account</p>
         </div>
 

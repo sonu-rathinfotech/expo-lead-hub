@@ -161,6 +161,85 @@ async function fetchTopKeywords(domain: string, limit = 10): Promise<string[]> {
   }
 }
 
+// ── AI Search Presence (AI Optimization → LLM Mentions) ───────────────────────
+// Is this domain actually CITED by AI answers? One live call per platform:
+//  - platform "google"   → cited in Google AI Overviews
+//  - platform "chat_gpt" → cited in ChatGPT answers
+// This is a domain/keyword lookup against DataForSEO's index — it does NOT crawl
+// the visitor's site, so a heavy site costs exactly the same as a small one.
+// Bounded to 2 calls/site (~$0.10 each). Degrade-safe: any failure → null.
+export interface AiMention {
+  googleAio: boolean | null; // cited in Google AI Overviews
+  chatgpt: boolean | null; // cited in ChatGPT answers
+  sampleQuery: string | null; // an example question where this domain IS cited
+  samplePlatform: string | null; // "Google AI Overview" | "ChatGPT"
+}
+
+// On only when DataForSEO creds are set AND not explicitly turned off. Lets the
+// booth cap spend — set DATAFORSEO_AI_MENTIONS=off to disable the paid AI check.
+export function aiMentionsEnabled(): boolean {
+  return (
+    Boolean(setting("DATAFORSEO_LOGIN") && setting("DATAFORSEO_PASSWORD")) &&
+    setting("DATAFORSEO_AI_MENTIONS") !== "off"
+  );
+}
+
+// Returns whether the domain is cited on this platform + a sample question where
+// it's cited (for the "what AI actually said" booth moment). null on API error.
+async function checkCited(
+  domain: string,
+  platform: "google" | "chat_gpt",
+): Promise<{ cited: boolean; question?: string } | null> {
+  try {
+    const data = await post(
+      "ai_optimization/llm_mentions/search/live",
+      [
+        {
+          target: [{ domain, search_scope: ["sources"] }],
+          platform,
+          location_code: settingInt("DATAFORSEO_LOCATION_CODE", 2840),
+          language_code: setting("DATAFORSEO_LANGUAGE_CODE") || "en",
+          limit: 1, // one row is enough to know IF it's cited + one sample query
+        },
+      ],
+      20_000,
+    );
+    const result = data?.tasks?.[0]?.result?.[0];
+    const items: any[] = Array.isArray(result?.items) ? result.items : [];
+    const total = result?.total_count;
+    const cited = typeof total === "number" ? total > 0 : items.length > 0;
+    const question = typeof items[0]?.question === "string" ? items[0].question : items[0]?.keyword;
+    return { cited, question: cited && typeof question === "string" ? question : undefined };
+  } catch (e) {
+    console.warn(`[dataforseo] llm_mentions (${platform}) failed:`, (e as Error).message);
+    return null;
+  }
+}
+
+export async function fetchAiMentions(url: string): Promise<AiMention> {
+  if (!aiMentionsEnabled()) return { googleAio: null, chatgpt: null, sampleQuery: null, samplePlatform: null };
+  const domain = toDomain(url);
+  const [g, c] = await Promise.all([checkCited(domain, "google"), checkCited(domain, "chat_gpt")]);
+
+  // Prefer a Google AI Overview sample (most relatable), else ChatGPT.
+  let sampleQuery: string | null = null;
+  let samplePlatform: string | null = null;
+  if (g?.cited && g.question) {
+    sampleQuery = g.question;
+    samplePlatform = "Google AI Overview";
+  } else if (c?.cited && c.question) {
+    sampleQuery = c.question;
+    samplePlatform = "ChatGPT";
+  }
+
+  return {
+    googleAio: g ? g.cited : null,
+    chatgpt: c ? c.cited : null,
+    sampleQuery,
+    samplePlatform,
+  };
+}
+
 export async function fetchDomainMetrics(url: string): Promise<DomainMetrics> {
   if (!setting("DATAFORSEO_LOGIN") || !setting("DATAFORSEO_PASSWORD")) return EMPTY;
   const domain = toDomain(url);

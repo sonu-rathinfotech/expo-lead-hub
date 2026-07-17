@@ -231,7 +231,7 @@ export function PublicLeadForm() {
             onSubmit={(values) => submitMutation.mutate(values)}
           />
 
-          <p className="mt-6 text-center text-xs text-gray-400">Powered by Exhibition Lead Capture</p>
+          <p className="mt-6 text-center text-xs text-gray-400">Powered by Rath Infotech</p>
         </div>
       </div>
     </Shell>

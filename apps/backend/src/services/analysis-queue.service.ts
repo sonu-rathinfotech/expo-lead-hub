@@ -1,14 +1,14 @@
 import { prisma } from "@elc/db";
 import { env } from "../config/env";
-import { getPageAnalyzer, getLighthouseAnalyzer, dataForSeoEnabled } from "./page-analyzer.service";
+import { getPageAnalyzer, getLighthouseAnalyzer } from "./page-analyzer.service";
 import { generateRoast } from "./ai-roast.service";
-import { generateComparison } from "./ai-score.service";
-import { fetchDomainMetrics, fetchCompetitors, type DomainMetrics } from "./dataforseo.service";
+import { gatherSignals, buildSiteVisibility, generateVisibilityReport } from "./ai-visibility.service";
+import { fetchAiMentions, aiMentionsEnabled } from "./dataforseo.service";
 import { emailService } from "./email.service";
 import { buildReportEmail } from "./email-templates.service";
 import { reportLink } from "../utils/play-link";
 import { alertOwnerOnKeyError } from "./owner-alert.service";
-import type { ComparisonResult } from "./ai-score.service";
+import type { VisibilityReport } from "./ai-visibility.service";
 
 // In-process job queue for website analyses. Up to AI_CONCURRENCY run at once;
 // additional requests wait in line. Keeps a busy booth from overloading the
@@ -27,21 +27,20 @@ interface Job {
 }
 
 // Email the finished report to the visitor (public play sessions only).
-async function emailReport(job: Job, result: ComparisonResult, metrics?: DomainMetrics | null) {
+async function emailReport(job: Job, result: VisibilityReport) {
   if (!job.email || !emailService.isEmailConfigured()) return;
-  const num = (v: number | null | undefined) => (v == null ? "—" : v.toLocaleString());
-  const m = metrics ?? ({} as DomainMetrics);
 
   const body = buildReportEmail({
-    yourScore: result.your?.overallScore ?? "—",
-    competitorScore: result.competitor?.overallScore ?? "—",
-    reasoning: result.verdict?.reasoning ?? "",
-    da: num(m.da),
-    pa: num(m.pa),
-    referringDomains: num(m.referringDomains),
-    backlinks: num(m.backlinks),
-    keywords: num(m.keywordCount),
-    traffic: num(m.organicTraffic),
+    yourScore: `${result.your?.score ?? "—"} (${result.your?.grade ?? "—"})`,
+    competitorScore: `${result.competitor?.score ?? "—"} (${result.competitor?.grade ?? "—"})`,
+    reasoning: result.comparison?.paragraph ?? "",
+    // AI Visibility report doesn't fetch domain-authority metrics — leave blank.
+    da: "—",
+    pa: "—",
+    referringDomains: "—",
+    backlinks: "—",
+    keywords: "—",
+    traffic: "—",
     reportLink: reportLink(job.analysisId),
   });
 
@@ -134,28 +133,34 @@ async function runJob(job: Job) {
     });
 
     if (job.competitorUrl) {
-      // ── AI Score Game: head-to-head comparison of two sites ──
-      // Captures + domain metrics (DA/PA/keywords) all run in parallel, then
-      // one Gemini comparison. The whole thing is capped at the 90s budget.
-      const withMetrics = dataForSeoEnabled();
+      // ── AI Visibility Report: how discoverable/understandable each site is to
+      // AI assistants. Lighthouse captures + real AI-visibility signal checks
+      // (llms.txt / robots.txt / structured data / content) run in parallel for
+      // every site, then one Gemini call writes the prose. Scores are computed
+      // deterministically here. The whole thing is capped at the 90s budget.
       const has2 = Boolean(job.competitorUrl2);
+      // Paid AI-citation check (LLM Mentions) — capped to you + competitor only
+      // (never competitor2) so a busy booth's spend stays bounded. Degrade-safe.
+      const withAiMentions = aiMentionsEnabled();
       const scoredComparison = async () => {
-        const [you, competitor, competitor2, youMetrics, compMetrics, comp2Metrics, competitors] = await Promise.all([
-          // Lighthouse capture (Core Web Vitals + screenshot) for all sites.
+        const [you, competitor, competitor2, youSig, compSig, comp2Sig, youMentions, compMentions] = await Promise.all([
           getLighthouseAnalyzer().analyze(job.url),
           getLighthouseAnalyzer().analyze(job.competitorUrl!),
           has2 ? getLighthouseAnalyzer().analyze(job.competitorUrl2!) : Promise.resolve(undefined),
-          withMetrics ? fetchDomainMetrics(job.url).catch(() => null) : Promise.resolve(null),
-          withMetrics ? fetchDomainMetrics(job.competitorUrl!).catch(() => null) : Promise.resolve(null),
-          withMetrics && has2 ? fetchDomainMetrics(job.competitorUrl2!).catch(() => null) : Promise.resolve(null),
-          // Top organic competitors of the visitor's own site (adds depth to the audit).
-          withMetrics ? fetchCompetitors(job.url).catch(() => []) : Promise.resolve([]),
+          gatherSignals(job.url),
+          gatherSignals(job.competitorUrl!),
+          has2 ? gatherSignals(job.competitorUrl2!) : Promise.resolve(undefined),
+          withAiMentions ? fetchAiMentions(job.url).catch(() => null) : Promise.resolve(null),
+          withAiMentions ? fetchAiMentions(job.competitorUrl!).catch(() => null) : Promise.resolve(null),
         ]);
-        const result = await withRetry(() => generateComparison(you, competitor, competitor2 ?? undefined));
-        return { you, competitor, competitor2, youMetrics, compMetrics, comp2Metrics, competitors, result };
+        const youViz = buildSiteVisibility(you, youSig);
+        const compViz = buildSiteVisibility(competitor, compSig);
+        const comp2Viz = competitor2 && comp2Sig ? buildSiteVisibility(competitor2, comp2Sig) : undefined;
+        const result = await withRetry(() => generateVisibilityReport(youViz, compViz, comp2Viz));
+        return { you, competitor, competitor2, result, youMentions, compMentions };
       };
 
-      const { you, competitor, competitor2, youMetrics, compMetrics, comp2Metrics, competitors, result } = await withDeadline(
+      const { you, competitor, competitor2, result, youMentions, compMentions } = await withDeadline(
         scoredComparison(),
         SCORE_DEADLINE_MS,
         "Analysis",
@@ -174,17 +179,12 @@ async function runJob(job: Job) {
           mobileShot: you.mobileShot ?? null,
           competitorShot: competitor.mobileShot ?? competitor.desktopShot ?? null,
           competitor2Shot: competitor2 ? competitor2.mobileShot ?? competitor2.desktopShot ?? null : null,
-          // Domain metrics ride alongside the AI verdict under audit.metrics.
-          audit: {
-            ...result,
-            metrics: { your: youMetrics, competitor: compMetrics, competitor2: comp2Metrics },
-            competitors, // top organic competitors of the visitor's site
-          } as any,
-          suggestions: result.suggestions as any,
+          // AI-citation presence (LLM Mentions) rides alongside the report.
+          audit: { ...result, aiMentions: { your: youMentions, competitor: compMentions } } as any,
         },
       });
       await syncGameResult(job, "COMPLETED");
-      void emailReport(job, result, youMetrics); // fire-and-forget the result email
+      void emailReport(job, result); // fire-and-forget the result email
       return;
     }
 

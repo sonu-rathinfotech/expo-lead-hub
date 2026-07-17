@@ -273,7 +273,7 @@ export function AutomationPage() {
 
   const testMutation = useMutation({
     mutationFn: (phone: string) =>
-      api.notifications.whatsappTest({ phone, message: "Test message from Exhibition Lead Capture" }),
+      api.notifications.whatsappTest({ phone, message: "Test message from Rath Infotech · MMD 2026" }),
     onSuccess: () => toast.success("Test message sent"),
     onError: (e: any) => toast.error(e?.response?.data?.message ?? "Test failed"),
   });

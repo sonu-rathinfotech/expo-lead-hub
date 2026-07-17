@@ -76,7 +76,7 @@ export function BoothLanding() {
       </div>
 
       <p className="mt-10 text-sm text-white/30">
-        {data?.booth ? `${data.booth.name} · ` : ""}Powered by Exhibition Lead Capture
+        {data?.booth ? `${data.booth.name} · ` : ""}Powered by Rath Infotech
       </p>
     </div>
   );

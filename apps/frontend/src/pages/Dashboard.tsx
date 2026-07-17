@@ -103,8 +103,8 @@ export function DashboardPage() {
         <>
           {/* KPI cards */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <KpiCard label="Total Leads" value={data.kpis.totalLeads} icon={Users} accent="bg-indigo-600" />
-            <KpiCard label="Today's Leads" value={data.kpis.todayLeads} icon={Clock} accent="bg-blue-600" />
+            <KpiCard label="Total Data" value={data.kpis.totalLeads} icon={Users} accent="bg-indigo-600" />
+            <KpiCard label="Today's Data" value={data.kpis.todayLeads} icon={Clock} accent="bg-blue-600" />
             <KpiCard label="Active Events" value={data.kpis.activeEvents} icon={Calendar} accent="bg-emerald-600" />
             <KpiCard label="Failed Syncs" value={data.kpis.failedSyncs} icon={AlertTriangle} accent="bg-red-600" />
             <KpiCard label="CRM Synced" value={data.kpis.crmSynced} icon={CheckCircle2} accent="bg-green-600" />
@@ -114,7 +114,7 @@ export function DashboardPage() {
 
           {/* Leads over time */}
           <Panel
-            title="Leads Over Time (last 14 days)"
+            title="Data Over Time (last 14 days)"
             action={
               <Link to="/leads" className="text-sm font-medium text-indigo-600 hover:underline">
                 View all leads →
@@ -125,7 +125,7 @@ export function DashboardPage() {
           </Panel>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Panel title="Leads by Source">
+            <Panel title="Data by Source">
               <Donut
                 data={data.bySource.map((s) => ({
                   label: s.source.replace("_", " "),
@@ -135,7 +135,7 @@ export function DashboardPage() {
               />
             </Panel>
 
-            <Panel title="Leads by Visitor Type">
+            <Panel title="Data by Visitor Type">
               <BarList
                 data={data.byVisitorType.map((v) => ({
                   label: v.name,
@@ -147,7 +147,7 @@ export function DashboardPage() {
             </Panel>
           </div>
 
-          <Panel title="Leads by Event">
+          <Panel title="Data by Event">
             <BarList
               data={data.byEvent.map((e) => ({ label: e.name, value: e.count }))}
               emptyText="No leads yet"

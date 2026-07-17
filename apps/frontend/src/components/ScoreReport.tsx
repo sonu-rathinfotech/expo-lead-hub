@@ -1,94 +1,45 @@
 import { useEffect, useState } from "react";
-import { Trophy, Crown, Sparkles, Monitor, Download } from "lucide-react";
+import { Sparkles, Download, CheckCircle2, AlertTriangle, XCircle, Lock, CalendarClock, TrendingUp, Monitor, Info, Zap, Quote, ArrowRight } from "lucide-react";
 import { ScoreRing, scoreColor } from "./ScoreRing";
 
 const YOU_COLOR = "#10b981"; // emerald
 const COMP_COLOR = "#f43f5e"; // rose
 const COMP2_COLOR = "#f59e0b"; // amber
 
-// ── Radar (spider) chart — you vs competitor across the AI dimensions ──
-function RadarChart({
-  axes,
-  series,
-  size = 260,
-}: {
-  axes: string[];
-  series: { label: string; color: string; values: number[] }[];
-  size?: number;
-}) {
-  const cx = size / 2;
-  const cy = size / 2;
-  const R = size / 2 - 42;
-  const n = axes.length;
-  const angle = (i: number) => (-90 + (i * 360) / n) * (Math.PI / 180);
-  const pt = (i: number, v: number) => {
-    const r = (R * Math.max(0, Math.min(100, v))) / 100;
-    return [cx + r * Math.cos(angle(i)), cy + r * Math.sin(angle(i))];
-  };
-  const poly = (values: number[]) => values.map((v, i) => pt(i, v).join(",")).join(" ");
+type SignalStatus = "good" | "warn" | "missing";
 
-  return (
-    <svg viewBox={`0 0 ${size} ${size}`} className="mx-auto h-auto w-full max-w-[300px]">
-      {/* grid rings */}
-      {[25, 50, 75, 100].map((ring) => (
-        <polygon
-          key={ring}
-          points={axes.map((_, i) => pt(i, ring).join(",")).join(" ")}
-          fill="none"
-          stroke="#e5e7eb"
-          strokeWidth={1}
-        />
-      ))}
-      {/* spokes */}
-      {axes.map((_, i) => {
-        const [x, y] = pt(i, 100);
-        return <line key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="#e5e7eb" strokeWidth={1} />;
-      })}
-      {/* series polygons */}
-      {series.map((s, si) => (
-        <polygon key={si} points={poly(s.values)} fill={s.color} fillOpacity={0.18} stroke={s.color} strokeWidth={2} />
-      ))}
-      {/* axis labels */}
-      {axes.map((label, i) => {
-        const [x, y] = pt(i, 118);
-        return (
-          <text
-            key={i}
-            x={x}
-            y={y}
-            textAnchor="middle"
-            dominantBaseline="middle"
-            className="fill-gray-500 text-[10px] font-semibold uppercase"
-          >
-            {label}
-          </text>
-        );
-      })}
-    </svg>
-  );
+interface Signal {
+  key: string;
+  label: string;
+  status: SignalStatus;
 }
 
-interface SiteScore {
-  overallScore?: number;
-  ui?: number;
-  ux?: number;
-  seo?: number;
-  conversion?: number;
-  llmScore?: number;
+interface Lighthouse {
+  performance?: number | null;
+  seo?: number | null;
+  accessibility?: number | null;
+  bestPractices?: number | null;
+}
+
+interface AiMention {
+  googleAio?: boolean | null; // cited in Google AI Overviews
+  chatgpt?: boolean | null; // cited in ChatGPT answers
+  sampleQuery?: string | null; // example question where this domain is cited
+  samplePlatform?: string | null; // "Google AI Overview" | "ChatGPT"
+}
+
+interface SiteVisibility {
+  url?: string;
+  score?: number;
+  grade?: string;
+  readiness?: number;
+  performance?: number | null;
+  lighthouse?: Lighthouse;
+  signals?: Signal[];
   summary?: string;
-  lighthouse?: { performance?: number | null; seo?: number | null; accessibility?: number | null; bestPractices?: number | null };
 }
 
-interface DomainMetrics {
-  da?: number | null;
-  pa?: number | null;
-  keywordCount?: number | null;
-  organicTraffic?: number | null;
-  referringDomains?: number | null;
-  backlinks?: number | null;
-  topKeywords?: string[];
-}
-
+// The report shape stored in WebsiteAnalysis.audit (see ai-visibility.service.ts).
 export interface Comparison {
   id: string;
   url: string;
@@ -100,21 +51,12 @@ export interface Comparison {
   competitorShot?: string | null;
   competitor2Shot?: string | null;
   audit?: {
-    your?: SiteScore;
-    competitor?: SiteScore;
-    competitor2?: SiteScore;
-    verdict?: { winner?: "you" | "competitor" | "competitor2" | "tie"; perCategory?: Array<{ key: string; youWin: boolean; note: string }>; reasoning?: string };
-    metrics?: { your?: DomainMetrics | null; competitor?: DomainMetrics | null; competitor2?: DomainMetrics | null } | null;
-    competitors?: { domain: string; sharedKeywords?: number | null }[] | null;
-  } | null;
-  suggestions?: {
-    heroHeadline?: string;
-    cta?: string;
-    colorPalette?: string[];
-    trustElements?: string[];
-    missingSections?: string[];
-    conversion?: string[];
-    mobile?: string[];
+    your?: SiteVisibility;
+    competitor?: SiteVisibility;
+    competitor2?: SiteVisibility;
+    comparison?: { advantage?: "you" | "competitor" | "competitor2" | "tie"; paragraph?: string };
+    opportunities?: string[];
+    aiMentions?: { your?: AiMention | null; competitor?: AiMention | null } | null;
   } | null;
 }
 
@@ -136,105 +78,500 @@ function useCountUp(target: number, ms = 1100) {
   return v;
 }
 
-function BigScore({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
-  const v = useCountUp(value);
-  return (
-    <div className={`flex flex-1 flex-col items-center rounded-2xl border p-5 ${highlight ? "border-amber-300 bg-amber-50" : "border-gray-200 bg-white"}`}>
-      {highlight && <Crown className="mb-1 text-amber-500" size={20} />}
-      <div style={{ color: scoreColor(value) }}>
-        <ScoreRing value={v} size={128} />
-      </div>
-      <p className="mt-2 truncate text-sm font-semibold text-gray-800" title={label}>{label}</p>
-    </div>
-  );
+function gradeColor(grade?: string) {
+  if (!grade) return "#6b7280";
+  if (grade.startsWith("A")) return "#15803d"; // green-700
+  if (grade.startsWith("B")) return "#b45309"; // amber-700
+  return "#b91c1c"; // red-700 (C / D)
 }
 
-function MetricsCol({ title, m, accent }: { title: string; m: DomainMetrics | null; accent: string }) {
-  const stat = (label: string, val: number | null | undefined) => (
-    <div className="flex justify-between text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className={`font-semibold ${accent}`}>{val == null ? "–" : val.toLocaleString()}</span>
-    </div>
-  );
+// ── Section 2: signal status icon (✅ / ⚠ / ❌) ──
+const STATUS_META: Record<SignalStatus, { cls: string; text: string }> = {
+  good: { cls: "text-emerald-600", text: "Good" },
+  warn: { cls: "text-amber-600", text: "Needs Improvement" },
+  missing: { cls: "text-rose-600", text: "Missing" },
+};
+
+function StatusIcon({ status, size = 18 }: { status?: SignalStatus; size?: number }) {
+  if (!status) return <span className="text-gray-300">–</span>;
+  const cls = STATUS_META[status].cls;
+  if (status === "good") return <CheckCircle2 size={size} className={cls} />;
+  if (status === "warn") return <AlertTriangle size={size} className={cls} />;
+  return <XCircle size={size} className={cls} />;
+}
+
+// Plain-language definitions shown as tooltips (hover the ⓘ) so sales & visitors
+// don't need to memorize what each signal means.
+const SIGNAL_INFO: Record<string, string> = {
+  llms_txt: "An llms.txt file tells AI models what your site is about and what to read — like a welcome guide for AI. Missing = AI has to guess.",
+  ai_crawlers: "Whether you allow AI bots (GPTBot, ClaudeBot, Google-Extended, PerplexityBot) to read your site. Blocked = you're invisible to that AI.",
+  structured_data: "Hidden schema/JSON-LD code that spells out your business in a format AI trusts. Present = AI can quote you accurately.",
+  entity_recognition: "Whether AI can clearly identify who you are as a business (name, brand, links). Missing = AI doesn't recognize you as a known entity.",
+  content_structure: "Clean headings and real text (not just images) so AI can read and summarize you. Poor structure = AI can't extract your message.",
+  page_performance: "How fast and technically healthy the page is (Google Lighthouse). Slow sites get crawled and cited less by AI.",
+};
+
+// Signals for YOUR site vs the competitor(s), side by side.
+function SignalCompare({ cols }: { cols: { label: string; color: string; site: SiteVisibility }[] }) {
+  const base = cols[0]?.site.signals ?? [];
+  const statusOf = (site: SiteVisibility, key: string) => site.signals?.find((s) => s.key === key)?.status;
   return (
-    <div>
-      <p className="mb-2 truncate text-sm font-semibold text-gray-800" title={title}>{title}</p>
-      <div className="space-y-1.5">
-        {stat("Domain Authority", m?.da)}
-        {stat("Page Authority", m?.pa)}
-        {stat("Referring domains", m?.referringDomains)}
-        {stat("Backlinks", m?.backlinks)}
-        {stat("Ranking keywords", m?.keywordCount)}
-        {stat("Est. organic traffic", m?.organicTraffic)}
-      </div>
-      {m?.topKeywords && m.topKeywords.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {m.topKeywords.slice(0, 5).map((k, i) => (
-            <span key={i} className="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600">{k}</span>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+            <th className="py-2 text-left">Signal</th>
+            {cols.map((c, i) => (
+              <th key={i} className="px-2 py-2 text-center">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: c.color }} />
+                  <span className="max-w-[7rem] truncate" title={c.label}>{c.label}</span>
+                </span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {base.map((sig) => (
+            <tr key={sig.key} className="border-t border-gray-100">
+              <td className="py-2.5 text-left font-medium text-gray-700">
+                <span className="inline-flex items-center gap-1.5">
+                  {sig.label}
+                  {SIGNAL_INFO[sig.key] && (
+                    <span title={SIGNAL_INFO[sig.key]} className="cursor-help text-gray-300 hover:text-gray-500 print:hidden">
+                      <Info size={13} />
+                    </span>
+                  )}
+                </span>
+              </td>
+              {cols.map((c, i) => (
+                <td key={i} className="px-2 py-2.5">
+                  <div className="flex justify-center"><StatusIcon status={statusOf(c.site, sig.key)} /></div>
+                </td>
+              ))}
+            </tr>
           ))}
-        </div>
-      )}
+        </tbody>
+      </table>
+      <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-gray-500">
+        <span className="inline-flex items-center gap-1"><CheckCircle2 size={13} className="text-emerald-600" /> Good</span>
+        <span className="inline-flex items-center gap-1"><AlertTriangle size={13} className="text-amber-600" /> Needs Improvement</span>
+        <span className="inline-flex items-center gap-1"><XCircle size={13} className="text-rose-600" /> Missing</span>
+      </div>
     </div>
   );
 }
 
-// Darker, print-legible shades for the score numbers (the bar keeps the
-// brighter scoreColor). Light amber text was near-invisible on white before.
-function scoreTextColor(v?: number | null) {
-  if (v == null) return "#6b7280";
-  if (v >= 90) return "#15803d"; // green-700
-  if (v >= 50) return "#b45309"; // amber-700
-  return "#b91c1c"; // red-700
-}
-
-function Bar({ label, you, comp }: { label: string; you?: number; comp?: number }) {
+// ── Section 5: Lighthouse technical-health bar (you vs competitor) ──
+function HealthBar({ label, you, comp }: { label: string; you?: number | null; comp?: number | null }) {
   const y = you ?? 0;
   const c = comp ?? 0;
-  const youWins = y > c;
-  const compWins = c > y;
   return (
     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-sm">
       <div className="flex items-center justify-end gap-2">
-        <span className="font-bold tabular-nums" style={{ color: scoreTextColor(you) }}>{you ?? "–"}</span>
-        <div className={`h-2.5 w-24 overflow-hidden rounded-full bg-gray-100 ${compWins ? "opacity-50" : ""}`}>
-          <div className="ml-auto h-full rounded-full" style={{ width: `${y}%`, backgroundColor: scoreColor(you), marginLeft: "auto", float: "right" }} />
+        <span className="font-bold tabular-nums" style={{ color: you == null ? "#9ca3af" : scoreColor(you) }}>{you ?? "–"}</span>
+        <div className="h-2 w-20 overflow-hidden rounded-full bg-gray-100">
+          <div className="ml-auto h-full rounded-full" style={{ width: `${y}%`, backgroundColor: scoreColor(you), float: "right" }} />
         </div>
       </div>
-      <span className="w-24 text-center text-xs font-medium uppercase tracking-wide text-gray-500">{label}</span>
+      <span className="w-28 text-center text-xs font-medium uppercase tracking-wide text-gray-500">{label}</span>
       <div className="flex items-center gap-2">
-        <div className={`h-2.5 w-24 overflow-hidden rounded-full bg-gray-100 ${youWins ? "opacity-50" : ""}`}>
+        <div className="h-2 w-20 overflow-hidden rounded-full bg-gray-100">
           <div className="h-full rounded-full" style={{ width: `${c}%`, backgroundColor: scoreColor(comp) }} />
         </div>
-        <span className="font-bold tabular-nums" style={{ color: scoreTextColor(comp) }}>{comp ?? "–"}</span>
+        <span className="font-bold tabular-nums" style={{ color: comp == null ? "#9ca3af" : scoreColor(comp) }}>{comp ?? "–"}</span>
       </div>
     </div>
   );
 }
 
-export function ScoreReport({ data }: { data: Comparison }) {
+// ── Section 6: captured screenshot card ──
+function Shot({ title, url, shot, tone }: { title: string; url?: string | null; shot?: string | null; tone: "you" | "comp" | "comp2" }) {
+  const bar = tone === "you" ? "bg-emerald-600" : tone === "comp" ? "bg-rose-600" : "bg-amber-500";
+  return (
+    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+      {/* print fallback: dark text + light bar so the title stays legible even if
+          the browser drops background colours in the PDF */}
+      <div className={`px-4 py-2 text-sm font-semibold text-white ${bar} print:bg-gray-100 print:text-gray-800`}>{title}</div>
+      {shot ? (
+        <img src={shot} alt="" className="max-h-64 w-full object-cover object-top" />
+      ) : (
+        <div className="flex h-40 items-center justify-center bg-gray-50 text-gray-300 print:hidden"><Monitor size={28} /></div>
+      )}
+      <div className="p-3"><p className="truncate text-xs text-gray-400">{url}</p></div>
+    </div>
+  );
+}
+
+// ── AI Search Presence — are you actually cited by AI answers? (DataForSEO) ──
+function CitedCell({ v }: { v?: boolean | null }) {
+  if (v == null) return <span className="text-xs text-gray-400">–</span>;
+  return v ? (
+    <span className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-600"><CheckCircle2 size={16} /> Cited</span>
+  ) : (
+    <span className="inline-flex items-center gap-1 text-sm font-semibold text-rose-600"><XCircle size={16} /> Not cited</span>
+  );
+}
+
+function AiPresence({
+  you,
+  competitor,
+  youLabel,
+  compLabel,
+}: {
+  you?: AiMention | null;
+  competitor?: AiMention | null;
+  youLabel: string;
+  compLabel: string;
+}) {
+  const rows: { label: string; key: "googleAio" | "chatgpt" }[] = [
+    { label: "Google AI Overview", key: "googleAio" },
+    { label: "ChatGPT", key: "chatgpt" },
+  ];
+  const youCited = you?.googleAio === true || you?.chatgpt === true;
+  const compCited = competitor?.googleAio === true || competitor?.chatgpt === true;
+  const headline =
+    compCited && !youCited
+      ? "Your competitor already shows up in AI answers — you don't, yet."
+      : youCited && !compCited
+        ? "You're ahead — AI already cites you over your competitor."
+        : youCited && compCited
+          ? "Both of you appear in AI answers — but there's room to lead."
+          : "Neither site is cited by AI yet — a wide-open opportunity to be first.";
+
+  return (
+    <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-5 shadow-sm">
+      <h3 className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-violet-600">
+        <Sparkles size={16} /> AI Search Presence
+      </h3>
+      <p className="mb-3 text-base font-semibold text-gray-900">{headline}</p>
+      <p className="mb-3 text-xs text-gray-500">
+        When buyers ask ChatGPT or Google's AI, does your business get named? AI assistants increasingly answer people before they ever visit a website — if they don't cite you, you're invisible at the moment of decision. (sample check)
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+              <th className="py-2 text-left">AI Assistant</th>
+              <th className="px-2 py-2 text-center"><span className="max-w-[8rem] truncate" title={youLabel}>{youLabel}</span></th>
+              <th className="px-2 py-2 text-center"><span className="max-w-[8rem] truncate" title={compLabel}>{compLabel}</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.key} className="border-t border-gray-100">
+                <td className="py-2.5 text-left font-medium text-gray-700">{r.label}</td>
+                <td className="px-2 py-2.5 text-center"><CitedCell v={you?.[r.key]} /></td>
+                <td className="px-2 py-2.5 text-center"><CitedCell v={competitor?.[r.key]} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {/* "What AI actually said" — the real question where someone gets cited.
+          Prefer the competitor's (strongest hook), else the visitor's own win. */}
+      {(() => {
+        const compSample = competitor?.sampleQuery ? competitor : null;
+        const youSample = you?.sampleQuery ? you : null;
+        if (compSample && !youCited) {
+          return (
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50/70 p-4">
+              <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-rose-600"><Quote size={13} /> What AI actually said</p>
+              <p className="mt-1.5 text-sm text-gray-700">
+                When people ask <span className="font-semibold text-gray-900">“{compSample.sampleQuery}”</span> on {compSample.samplePlatform || "AI"},{" "}
+                <span className="font-semibold text-rose-700">{compLabel}</span> gets named — <span className="font-semibold">{youLabel}</span> does not.
+              </p>
+            </div>
+          );
+        }
+        if (youSample) {
+          return (
+            <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+              <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-emerald-600"><Quote size={13} /> What AI actually said</p>
+              <p className="mt-1.5 text-sm text-gray-700">
+                AI already cites <span className="font-semibold text-emerald-700">{youLabel}</span> when people ask{" "}
+                <span className="font-semibold text-gray-900">“{youSample.sampleQuery}”</span> on {youSample.samplePlatform || "AI"}.
+              </p>
+            </div>
+          );
+        }
+        return null;
+      })()}
+      <p className="mt-3 text-xs text-gray-400">Full AI citation audit — every assistant &amp; query — is included in your complete report.</p>
+    </div>
+  );
+}
+
+// ── #3 Fix-it priority: fastest path to a higher grade (frontend-only) ──
+const SIGNAL_ACTIONS: Record<string, string> = {
+  llms_txt: "Add an llms.txt guide so AI models know what to read",
+  ai_crawlers: "Allow the AI crawlers (GPTBot, ClaudeBot, Google-Extended, PerplexityBot)",
+  structured_data: "Add structured data (schema markup) that AI can trust",
+  entity_recognition: "Define your business entity so AI recognizes your brand",
+  content_structure: "Improve content structure — clear headings & readable text",
+  page_performance: "Improve page speed & technical health",
+};
+
+function gradeForScore(score: number): string {
+  return (GRADE_BANDS.find((b) => score >= b.min) ?? GRADE_BANDS[GRADE_BANDS.length - 1]!).g;
+}
+
+function FixItPanel({ site, onBookMeeting }: { site: SiteVisibility; onBookMeeting?: () => void }) {
+  const gaps = (site.signals ?? [])
+    .map((s) => {
+      const max = SIGNAL_WEIGHTS[s.key] ?? 0;
+      return { ...s, gain: max - Math.round(max * (STATUS_FACTOR[s.status] ?? 0)) };
+    })
+    .filter((g) => g.gain > 0)
+    .sort((a, b) => b.gain - a.gain)
+    .slice(0, 3);
+  if (!gaps.length) return null;
+
+  const cur = site.score ?? 0;
+  const potential = Math.min(100, cur + gaps.reduce((n, g) => n + g.gain, 0));
+  const curGrade = site.grade ?? gradeForScore(cur);
+  const potGrade = gradeForScore(potential);
+  const jumps = potGrade !== curGrade;
+
+  return (
+    <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-sm">
+      <h3 className="mb-1 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-emerald-700">
+        <TrendingUp size={16} /> Your fastest path to a higher grade
+      </h3>
+      <p className="mb-4 text-sm text-gray-700">
+        Fix these {gaps.length} and your AI Visibility Score could rise from{" "}
+        <span className="font-bold text-gray-900">{cur} ({curGrade})</span> to about{" "}
+        <span className="font-bold text-emerald-700">{potential} ({potGrade})</span>
+        {jumps ? " — a full grade jump." : "."}
+      </p>
+      <ol className="space-y-2.5">
+        {gaps.map((g, i) => (
+          <li key={g.key} className="flex items-start gap-3 rounded-xl border border-gray-100 bg-white p-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white">{i + 1}</span>
+            <span className="flex-1 text-sm text-gray-800">{SIGNAL_ACTIONS[g.key] ?? g.label}</span>
+            <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-700">+{g.gain} pts</span>
+          </li>
+        ))}
+      </ol>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-gray-600">Our team can implement all of this for you.</p>
+        {onBookMeeting && (
+          <button
+            onClick={onBookMeeting}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 print:hidden"
+          >
+            Book a session <ArrowRight size={15} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── #4 Urgency banner (static, no API) ──
+function UrgencyBanner() {
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+      <Zap size={18} className="mt-0.5 shrink-0 text-amber-500" />
+      <p className="text-sm leading-relaxed text-amber-900">
+        <span className="font-bold">AI is the new front page.</span> More buyers now ask ChatGPT, Gemini and Google's AI for
+        recommendations before visiting any website. If AI can't read and cite your site, you're invisible at the exact
+        moment they decide.
+      </p>
+    </div>
+  );
+}
+
+// Mirror of the backend weights (ai-visibility.service.ts) so the report can
+// show exactly how each signal contributed to the score.
+const SIGNAL_WEIGHTS: Record<string, number> = {
+  ai_crawlers: 20,
+  structured_data: 20,
+  llms_txt: 15,
+  entity_recognition: 15,
+  content_structure: 15,
+  page_performance: 15,
+};
+const STATUS_FACTOR: Record<SignalStatus, number> = { good: 1, warn: 0.5, missing: 0 };
+const GRADE_BANDS = [
+  { g: "A+", min: 95 },
+  { g: "A", min: 85 },
+  { g: "B+", min: 75 },
+  { g: "B", min: 65 },
+  { g: "C", min: 50 },
+  { g: "D", min: 0 },
+];
+
+function PointBar({ label, earned, max, status }: { label: string; earned: number; max: number; status: SignalStatus }) {
+  const pct = max ? (earned / max) * 100 : 0;
+  const color = status === "good" ? "#16a34a" : status === "warn" ? "#f59e0b" : "#dc2626";
+  return (
+    <div className="flex items-center gap-3 text-sm">
+      <span className="w-36 shrink-0 truncate text-gray-700" title={label}>{label}</span>
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-100">
+        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+      </div>
+      <span className="w-11 shrink-0 text-right font-semibold tabular-nums" style={{ color }}>+{earned}<span className="text-gray-400">/{max}</span></span>
+    </div>
+  );
+}
+
+// "Why this grade" — transparent breakdown of the score for visitors & sales.
+function ScoreBreakdown({ site }: { site: SiteVisibility }) {
+  const rows = (site.signals ?? []).map((s) => {
+    const max = SIGNAL_WEIGHTS[s.key] ?? 0;
+    return { ...s, max, earned: Math.round(max * (STATUS_FACTOR[s.status] ?? 0)) };
+  });
+  if (!rows.length) return null;
+  const boosting = rows.filter((r) => r.status === "good");
+  const gaps = rows.filter((r) => r.status !== "good").sort((a, b) => b.max - b.earned - (a.max - a.earned));
+  const lost = gaps.reduce((n, r) => n + (r.max - r.earned), 0);
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">Why this grade</h3>
+
+      {/* Grade scale — current grade highlighted */}
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        {GRADE_BANDS.map((b) => {
+          const active = b.g === site.grade;
+          return (
+            <span
+              key={b.g}
+              className={`rounded-lg px-2.5 py-1 text-center text-xs font-bold ${active ? "text-white shadow" : "text-gray-400"}`}
+              style={{ backgroundColor: active ? gradeColor(site.grade) : "#f3f4f6" }}
+            >
+              {b.g}<span className={`ml-1 font-normal ${active ? "text-white/70" : "text-gray-300"}`}>{b.min}+</span>
+            </span>
+          );
+        })}
+      </div>
+
+      <p className="mb-4 text-sm text-gray-600">
+        You scored <span className="font-bold text-gray-900">{site.score}/100</span>. {boosting.length} signal{boosting.length === 1 ? "" : "s"} {boosting.length === 1 ? "is" : "are"} working in your favour;
+        {gaps.length > 0 ? <> closing the {gaps.length} gap{gaps.length === 1 ? "" : "s"} below could add up to <span className="font-bold text-emerald-600">+{lost} points</span>.</> : " you've covered every signal."}
+      </p>
+
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        <div>
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-emerald-600"><CheckCircle2 size={14} /> Boosting your score</p>
+          <div className="space-y-2.5">
+            {boosting.length ? boosting.map((r) => <PointBar key={r.key} label={r.label} earned={r.earned} max={r.max} status={r.status} />) : <p className="text-sm text-gray-400">None yet.</p>}
+          </div>
+        </div>
+        <div>
+          <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-rose-600"><AlertTriangle size={14} /> Holding you back</p>
+          <div className="space-y-2.5">
+            {gaps.length ? gaps.map((r) => <PointBar key={r.key} label={r.label} earned={r.earned} max={r.max} status={r.status} />) : <p className="text-sm text-gray-400">Nothing — great job!</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Section 1: the big AI Visibility Score ring + grade ──
+function VisibilityScore({ site }: { site: SiteVisibility }) {
+  const v = useCountUp(site.score ?? 0);
+  return (
+    <div className="flex flex-col items-center gap-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:gap-8">
+      <div className="flex shrink-0 flex-col items-center gap-2">
+        <div style={{ color: scoreColor(site.score) }}>
+          <ScoreRing value={v} size={148} />
+        </div>
+        <span
+          className="rounded-full px-3 py-0.5 text-sm font-bold"
+          style={{ color: gradeColor(site.grade), backgroundColor: `${gradeColor(site.grade)}18` }}
+        >
+          Grade {site.grade ?? "—"}
+        </span>
+      </div>
+      <div className="text-center sm:text-left">
+        <p className="text-xs font-bold uppercase tracking-wide text-indigo-500">AI Visibility Score</p>
+        <p className="mt-1 text-sm leading-relaxed text-gray-700">{site.summary || "AI visibility analysis complete."}</p>
+        {site.readiness != null && (
+          <div className="mt-3 inline-flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-1.5 text-sm">
+            <span className="font-semibold text-indigo-700">AI Readiness</span>
+            <span className="font-bold tabular-nums" style={{ color: scoreColor(site.readiness) }}>{site.readiness}/100</span>
+            <span className="text-xs text-gray-500">how ready your content is for AI to cite</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Section 3: competitor comparison table ──
+function CompareTable({ cols }: { cols: { label: string; color: string; site: SiteVisibility }[] }) {
+  const rows: { label: string; get: (s: SiteVisibility) => number | null | undefined }[] = [
+    { label: "AI Visibility Score", get: (s) => s.score },
+    { label: "AI Readiness", get: (s) => s.readiness },
+    { label: "Performance", get: (s) => s.performance },
+  ];
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+            <th className="py-2 text-left font-semibold">Metric</th>
+            {cols.map((c, i) => (
+              <th key={i} className="px-2 py-2 text-center">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: c.color }} />
+                  <span className="max-w-[8rem] truncate" title={c.label}>{c.label}</span>
+                </span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, ri) => {
+            const vals = cols.map((c) => r.get(c.site));
+            const best = Math.max(...vals.map((v) => (v == null ? -1 : v)));
+            return (
+              <tr key={ri} className="border-t border-gray-100">
+                <td className="py-2.5 text-left font-medium text-gray-600">{r.label}</td>
+                {vals.map((v, ci) => (
+                  <td key={ci} className="px-2 py-2.5 text-center">
+                    <span
+                      className="tabular-nums font-bold"
+                      style={{ color: v != null && v === best ? "#15803d" : "#374151" }}
+                    >
+                      {v == null ? "–" : Math.round(v)}
+                    </span>
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+export function ScoreReport({ data, onBookMeeting }: { data: Comparison; onBookMeeting?: () => void }) {
   const your = data.audit?.your ?? {};
   const comp = data.audit?.competitor ?? {};
-  const verdict = data.audit?.verdict ?? {};
-  const sug = data.suggestions ?? {};
-  const youWin = verdict.winner === "you";
-  const tie = verdict.winner === "tie";
-  const lh = your.lighthouse ?? {};
-  const clh = comp.lighthouse ?? {};
   const comp2 = data.audit?.competitor2 ?? null;
-  const myMetrics = data.audit?.metrics?.your ?? null;
-  const compMetrics = data.audit?.metrics?.competitor ?? null;
-  const comp2Metrics = data.audit?.metrics?.competitor2 ?? null;
-  const competitors = data.audit?.competitors ?? [];
+  const comparison = data.audit?.comparison ?? {};
+  const opportunities = data.audit?.opportunities ?? [];
+  const signals = your.signals ?? [];
+  const aiMentions = data.audit?.aiMentions ?? null;
+  const hasAiMentions =
+    !!aiMentions &&
+    [aiMentions.your?.googleAio, aiMentions.your?.chatgpt, aiMentions.competitor?.googleAio, aiMentions.competitor?.chatgpt].some(
+      (v) => v != null,
+    );
 
   // Who this report is for — drives the header + the saved PDF filename.
-  const who = data.company || hostOf(data.url) || "Website Audit";
+  const who = data.company || hostOf(data.url) || "Website";
+  const reportDate = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
   const downloadPdf = () => {
     const prev = document.title;
     const date = new Date().toISOString().slice(0, 10);
-    // Browsers use document.title as the default "Save as PDF" filename, so
-    // name it after the client/company instead of the app title.
-    document.title = `Website Audit — ${who} — ${date}`;
+    document.title = `AI Visibility Report — ${who} — ${date}`;
     const restore = () => {
       document.title = prev;
       window.removeEventListener("afterprint", restore);
@@ -244,17 +581,11 @@ export function ScoreReport({ data }: { data: Comparison }) {
     setTimeout(restore, 1500); // fallback if afterprint doesn't fire
   };
 
-  const radarAxes = ["UI", "UX", "SEO", "Conv", "AI"];
-  const radarSeries = [
-    { label: hostOf(data.url) || "You", color: YOU_COLOR, values: [your.ui ?? 0, your.ux ?? 0, your.seo ?? 0, your.conversion ?? 0, your.llmScore ?? 0] },
-    { label: hostOf(data.competitorUrl) || "Partner", color: COMP_COLOR, values: [comp.ui ?? 0, comp.ux ?? 0, comp.seo ?? 0, comp.conversion ?? 0, comp.llmScore ?? 0] },
+  const cols = [
+    { label: hostOf(data.url) || "You", color: YOU_COLOR, site: your },
+    { label: hostOf(data.competitorUrl) || "Competitor", color: COMP_COLOR, site: comp },
   ];
-  if (comp2)
-    radarSeries.push({
-      label: hostOf(data.competitorUrl2) || "Partner 2",
-      color: COMP2_COLOR,
-      values: [comp2.ui ?? 0, comp2.ux ?? 0, comp2.seo ?? 0, comp2.conversion ?? 0, comp2.llmScore ?? 0],
-    });
+  if (comp2) cols.push({ label: hostOf(data.competitorUrl2) || "Competitor 2", color: COMP2_COLOR, site: comp2 });
 
   return (
     <div
@@ -265,13 +596,17 @@ export function ScoreReport({ data }: { data: Comparison }) {
           '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
       }}
     >
-      {/* Report header — identifies whose audit this is (on screen + in the PDF).
-          Only the download button is hidden when printing. */}
-      <div className="flex items-start justify-between gap-4 border-b border-gray-200 pb-4">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4 border-b border-gray-200 pb-5">
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-wide text-indigo-500">Website Audit Report</p>
-          <h1 className="mt-0.5 truncate text-2xl font-bold tracking-tight text-gray-900" title={who}>{who}</h1>
-          <p className="mt-0.5 truncate text-sm text-gray-500">{hostOf(data.url) || data.url}</p>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-indigo-600">
+            <Sparkles size={12} /> AI Visibility Report
+          </span>
+          <h1 className="mt-2 truncate text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl" title={who}>{who}</h1>
+          <p className="mt-1 max-w-xl text-sm leading-relaxed text-gray-600">
+            How discoverable <span className="font-medium text-gray-700">{hostOf(data.url) || "your site"}</span> is to AI assistants — ChatGPT, Gemini, Perplexity &amp; Google AI Overviews.
+          </p>
+          <p className="mt-2 text-xs font-medium text-gray-400">Prepared {reportDate} · Rath Infotech</p>
         </div>
         <button
           onClick={downloadPdf}
@@ -281,180 +616,133 @@ export function ScoreReport({ data }: { data: Comparison }) {
         </button>
       </div>
 
-      {/* Verdict banner */}
-      <div className={`rounded-2xl p-6 text-center text-white shadow-lg ${youWin ? "bg-gradient-to-r from-emerald-500 to-teal-600" : tie ? "bg-gradient-to-r from-slate-500 to-slate-700" : "bg-gradient-to-r from-orange-500 to-rose-600"}`}>
-        <Trophy className="mx-auto mb-1.5" size={26} />
-        <h2 className="text-2xl font-bold tracking-tight">
-          {youWin ? "Your site leads" : tie ? "It's a close call" : "How your site compares"}
-        </h2>
-        <p className="mx-auto mt-0.5 text-xs font-medium uppercase tracking-wide text-white/70">
-          {who} vs {hostOf(data.competitorUrl) || "partner"}
-        </p>
-        <p className="mx-auto mt-1.5 max-w-2xl text-sm leading-relaxed text-white/80">{verdict.reasoning}</p>
-      </div>
+      {/* Urgency framing (static) */}
+      <UrgencyBanner />
 
-      {/* Big scores head-to-head */}
-      <div className="flex flex-col items-stretch gap-4 sm:flex-row">
-        <BigScore label={data.company || hostOf(data.url) || "Your site"} value={your.overallScore ?? 0} highlight={youWin} />
-        <div className="flex items-center justify-center px-2 text-lg font-black text-gray-400">VS</div>
-        <BigScore label={hostOf(data.competitorUrl) || "Partner"} value={comp.overallScore ?? 0} highlight={verdict.winner === "competitor"} />
-        {comp2 && (
-          <>
-            <div className="flex items-center justify-center px-2 text-lg font-black text-gray-400">VS</div>
-            <BigScore label={hostOf(data.competitorUrl2) || "Partner 2"} value={comp2.overallScore ?? 0} highlight={verdict.winner === "competitor2"} />
-          </>
+      {/* 1. AI Visibility Score */}
+      <VisibilityScore site={your} />
+
+      {/* Why this grade — score breakdown */}
+      <ScoreBreakdown site={your} />
+
+      {/* Fastest path to a higher grade — actionable, ties to the CTA */}
+      <FixItPanel site={your} onBookMeeting={onBookMeeting} />
+
+      {/* AI Search Presence — are you cited by AI? (moved up: strongest hook) */}
+      {hasAiMentions && (
+        <AiPresence
+          you={aiMentions!.your}
+          competitor={aiMentions!.competitor}
+          youLabel={hostOf(data.url) || "You"}
+          compLabel={hostOf(data.competitorUrl) || "Competitor"}
+        />
+      )}
+
+      {/* 2. AI Visibility Signals — you vs competitor */}
+      <div className="rounded-2xl border border-gray-200 bg-gray-50/60 p-5 shadow-sm">
+        <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">AI Visibility Signals</h3>
+        {signals.length > 0 ? (
+          <SignalCompare cols={cols} />
+        ) : (
+          <p className="text-sm text-gray-400">No signals available.</p>
         )}
       </div>
 
-      {/* What the score means */}
-      <p className="text-center text-xs leading-relaxed text-gray-500">
-        Overall score is out of 100 — <span className="font-semibold text-emerald-600">90–100 Excellent</span>,{" "}
-        <span className="font-semibold text-amber-600">50–89 Good</span>,{" "}
-        <span className="font-semibold text-rose-600">below 50 Needs work</span>. It blends design, UX, SEO, conversion &amp; AI-search; the higher score wins.
-      </p>
+      {/* 3. Competitor Comparison */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+        <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">Competitor Comparison</h3>
+        <CompareTable cols={cols} />
+        {comparison.paragraph && (
+          <p className="mt-4 text-sm leading-relaxed text-gray-700">{comparison.paragraph}</p>
+        )}
+      </div>
 
-      {/* Radar + category comparison */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,340px)_1fr]">
-        {/* Radar */}
+      {/* Technical health (Lighthouse) — supports the Page Performance signal */}
+      {(your.lighthouse || comp.lighthouse) && (
         <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-gray-500">At a glance</h3>
-          <RadarChart axes={radarAxes} series={radarSeries} />
-          <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1">
-            {radarSeries.map((s, i) => (
-              <span key={i} className="inline-flex items-center gap-1.5 text-xs text-gray-600">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }} />
-                {s.label}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Category comparison */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 grid grid-cols-[1fr_auto_1fr] text-xs font-semibold uppercase tracking-wide text-gray-400">
-            <span className="text-right">You</span><span className="w-24 text-center">Metric</span><span>Partner</span>
+          <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-500">Technical health</h3>
+          <div className="mb-3 grid grid-cols-[1fr_auto_1fr] text-xs font-semibold uppercase tracking-wide text-gray-400">
+            <span className="text-right">You</span><span className="w-28 text-center">Metric</span><span>Competitor</span>
           </div>
           <div className="space-y-3">
-            <Bar label="UI" you={your.ui} comp={comp.ui} />
-            <Bar label="UX" you={your.ux} comp={comp.ux} />
-            <Bar label="SEO" you={your.seo} comp={comp.seo} />
-            <Bar label="Conversion" you={your.conversion} comp={comp.conversion} />
-            {(your.llmScore != null || comp.llmScore != null) && <Bar label="AI Search" you={your.llmScore} comp={comp.llmScore} />}
-            {(lh.performance != null || clh.performance != null) && <Bar label="Performance" you={lh.performance ?? undefined} comp={clh.performance ?? undefined} />}
-            {(lh.accessibility != null || clh.accessibility != null) && <Bar label="Accessibility" you={lh.accessibility ?? undefined} comp={clh.accessibility ?? undefined} />}
-            {(lh.bestPractices != null || clh.bestPractices != null) && <Bar label="Best Practices" you={lh.bestPractices ?? undefined} comp={clh.bestPractices ?? undefined} />}
+            <HealthBar label="Performance" you={your.lighthouse?.performance} comp={comp.lighthouse?.performance} />
+            <HealthBar label="SEO" you={your.lighthouse?.seo} comp={comp.lighthouse?.seo} />
+            <HealthBar label="Accessibility" you={your.lighthouse?.accessibility} comp={comp.lighthouse?.accessibility} />
+            <HealthBar label="Best Practices" you={your.lighthouse?.bestPractices} comp={comp.lighthouse?.bestPractices} />
           </div>
-          <p className="mt-3 text-center text-xs text-gray-400">
-            The stronger side shows in full colour. UI / UX / Conversion are AI scores;
-            <span className="font-medium"> AI Search</span> = how likely AI assistants (ChatGPT, Gemini) are to recommend the site;
-            Performance / Accessibility are Lighthouse.
-          </p>
-        </div>
-      </div>
-
-      {/* Domain authority + keywords (DataForSEO) */}
-      {(myMetrics || compMetrics) && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-gray-500">Domain authority &amp; keywords</h3>
-          <div className={`grid gap-4 ${comp2 ? "grid-cols-3" : "grid-cols-2"}`}>
-            <MetricsCol title={data.company || hostOf(data.url) || "Your site"} m={myMetrics} accent="text-emerald-600" />
-            <MetricsCol title={hostOf(data.competitorUrl) || "Partner"} m={compMetrics} accent="text-rose-600" />
-            {comp2 && <MetricsCol title={hostOf(data.competitorUrl2) || "Partner 2"} m={comp2Metrics} accent="text-rose-600" />}
-          </div>
-          <p className="mt-3 text-center text-xs text-gray-400">DA / PA are DataForSEO domain &amp; page ranks (0–1000). Keywords &amp; traffic are organic estimates.</p>
+          <p className="mt-3 text-center text-xs text-gray-400">Google Lighthouse scores (0–100). Higher is better; the stronger side shows in green.</p>
         </div>
       )}
 
-      {/* Top organic competitors (DataForSEO) */}
-      {competitors.length > 0 && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-gray-500">Your top organic competitors</h3>
-          <div className="flex flex-wrap gap-2">
-            {competitors.map((c, i) => (
-              <span key={i} className="inline-flex items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 text-sm">
-                <span className="font-medium text-gray-800">{c.domain}</span>
-                {c.sharedKeywords != null && <span className="text-xs text-gray-500">{c.sharedKeywords} shared</span>}
-              </span>
+      {/* Captured screenshots */}
+      {(data.mobileShot || data.desktopShot || data.competitorShot) && (
+        <div className={`grid grid-cols-1 gap-4 ${comp2 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+          <Shot title={data.company || "Your site"} url={data.url} shot={data.mobileShot || data.desktopShot} tone="you" />
+          <Shot title={hostOf(data.competitorUrl) || "Competitor"} url={data.competitorUrl} shot={data.competitorShot} tone="comp" />
+          {comp2 && <Shot title={hostOf(data.competitorUrl2) || "Competitor 2"} url={data.competitorUrl2} shot={data.competitor2Shot} tone="comp2" />}
+        </div>
+      )}
+
+      {/* 4. Top 3 AI Opportunities */}
+      {opportunities.length > 0 && (
+        <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-5 shadow-sm">
+          <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-900">
+            <Sparkles size={18} className="text-indigo-500" /> Top 3 AI Opportunities
+          </h3>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            {opportunities.slice(0, 3).map((o, i) => (
+              <div key={i} className="rounded-xl border border-gray-100 bg-white p-4">
+                <div className="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-indigo-600">
+                  <TrendingUp size={16} />
+                </div>
+                <p className="text-sm font-medium text-gray-800">{o}</p>
+              </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Summaries + screenshots */}
-      <div className={`grid grid-cols-1 gap-4 ${comp2 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
-        <SiteCard title={data.company || "Your site"} url={data.url} shot={data.mobileShot || data.desktopShot} summary={your.summary} tone="emerald" />
-        <SiteCard title="Partner" url={data.competitorUrl} shot={data.competitorShot} summary={comp.summary} tone="rose" />
-        {comp2 && <SiteCard title="Partner 2" url={data.competitorUrl2} shot={data.competitor2Shot} summary={comp2.summary} tone="rose" />}
-      </div>
-
-      {/* Suggestions to win */}
-      {data.suggestions && (
-        <div className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-5 shadow-sm">
-          <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-gray-900">
-            <Sparkles size={18} className="text-indigo-500" /> How to beat them
-          </h3>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {sug.heroHeadline && <Sg title="Stronger headline">{sug.heroHeadline}</Sg>}
-            {sug.cta && <Sg title="Better CTA">{sug.cta}</Sg>}
-            {sug.colorPalette && sug.colorPalette.length > 0 && (
-              <div className="print:hidden">
-                <Sg title="Suggested palette">
-                  <div className="flex gap-1.5">
-                    {sug.colorPalette.map((c, i) => <span key={i} className="h-7 w-7 rounded-md border border-gray-200" style={{ backgroundColor: c }} />)}
-                  </div>
-                </Sg>
-              </div>
-            )}
-            {list(sug.trustElements, "Trust elements")}
-            {list(sug.missingSections, "Missing sections")}
-            {list(sug.conversion, "Conversion tips")}
-            {list(sug.mobile, "Mobile tips")}
+      {/* 5. Premium Report CTA — print falls back to dark-on-light so it stays
+          legible even if the PDF drops the dark gradient background. */}
+      <div className="rounded-2xl bg-gradient-to-r from-slate-900 to-indigo-900 p-6 text-white shadow-lg print:bg-none print:bg-white print:text-gray-900">
+        <h3 className="flex items-center justify-center gap-2 text-center text-xl font-bold print:text-gray-900">
+          <Lock size={20} /> Unlock Your Complete AI Visibility Report
+        </h3>
+        <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-white/70 print:text-gray-600">
+          Your free analysis provides a snapshot of your AI readiness. Book a strategy session to receive:
+        </p>
+        <ul className="mx-auto mt-4 grid max-w-xl grid-cols-1 gap-2 text-sm text-white/90 sm:grid-cols-2 print:text-gray-800">
+          {[
+            "Complete AI Visibility Audit",
+            "Competitor Gap Analysis",
+            "GEO/AEO Strategy",
+            "AI Citation Opportunities",
+            "Personalized Action Plan",
+          ].map((f) => (
+            <li key={f} className="flex items-center gap-2">
+              <CheckCircle2 size={16} className="shrink-0 text-emerald-400 print:text-emerald-600" /> {f}
+            </li>
+          ))}
+        </ul>
+        {onBookMeeting && (
+          <div className="mt-5 text-center print:hidden">
+            <button
+              onClick={onBookMeeting}
+              className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-2.5 text-sm font-bold text-indigo-900 shadow hover:bg-indigo-50"
+            >
+              <CalendarClock size={16} /> Book a Strategy Session
+            </button>
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SiteCard({ title, url, shot, summary, tone }: { title: string; url?: string | null; shot?: string | null; summary?: string; tone: "emerald" | "rose" }) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <div className={`px-4 py-2 text-sm font-semibold text-white ${tone === "emerald" ? "bg-emerald-600" : "bg-rose-600"}`}>{title}</div>
-      {shot ? (
-        <img src={shot} alt="" className="max-h-64 w-full object-cover object-top" />
-      ) : (
-        <div className="flex h-40 items-center justify-center bg-gray-50 text-gray-300"><Monitor size={28} /></div>
-      )}
-      <div className="p-4">
-        <p className="truncate text-xs text-gray-400">{url}</p>
-        {summary && <p className="mt-1 text-sm text-gray-700">{summary}</p>}
+        )}
       </div>
     </div>
-  );
-}
-
-function Sg({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl border border-gray-100 bg-white p-4">
-      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-indigo-500">{title}</p>
-      <div className="text-sm text-gray-700">{children}</div>
-    </div>
-  );
-}
-
-function list(items: string[] | undefined, title: string) {
-  if (!items || items.length === 0) return null;
-  return (
-    <Sg title={title}>
-      <ul className="list-disc space-y-0.5 pl-4">{items.map((it, i) => <li key={i}>{it}</li>)}</ul>
-    </Sg>
   );
 }
 
 function hostOf(u?: string | null) {
   if (!u) return "";
   try {
-    return new URL(u).hostname.replace(/^www\./, "");
+    return new URL(u.startsWith("http") ? u : `https://${u}`).hostname.replace(/^www\./, "");
   } catch {
     return u;
   }

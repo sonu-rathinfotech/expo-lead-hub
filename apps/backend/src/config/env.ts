@@ -33,6 +33,10 @@ const envSchema = z.object({
   // Market for DataForSEO keyword/rank data (defaults: USA / English).
   DATAFORSEO_LOCATION_CODE: z.coerce.number().int().default(2840),
   DATAFORSEO_LANGUAGE_CODE: z.string().default("en"),
+  // Paid AI-citation check (LLM Mentions) for the AI Visibility report — on by
+  // default when DataForSEO creds are set. Set to "off" to skip the ~$0.40/audit
+  // AI calls while keeping the rest of DataForSEO working.
+  DATAFORSEO_AI_MENTIONS: z.enum(["on", "off"]).default("on"),
   // WhatsApp (OpenWA self-hosted gateway) — all optional; feature is disabled
   // until OPENWA_BASE_URL + OPENWA_API_KEY are set.
   OPENWA_BASE_URL: z.string().optional(),

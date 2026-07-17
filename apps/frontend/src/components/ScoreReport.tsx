@@ -306,6 +306,13 @@ export function ScoreReport({ data }: { data: Comparison }) {
         )}
       </div>
 
+      {/* What the score means */}
+      <p className="text-center text-xs leading-relaxed text-gray-500">
+        Overall score is out of 100 — <span className="font-semibold text-emerald-600">90–100 Excellent</span>,{" "}
+        <span className="font-semibold text-amber-600">50–89 Good</span>,{" "}
+        <span className="font-semibold text-rose-600">below 50 Needs work</span>. It blends design, UX, SEO, conversion &amp; AI-search; the higher score wins.
+      </p>
+
       {/* Radar + category comparison */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,340px)_1fr]">
         {/* Radar */}
@@ -390,11 +397,13 @@ export function ScoreReport({ data }: { data: Comparison }) {
             {sug.heroHeadline && <Sg title="Stronger headline">{sug.heroHeadline}</Sg>}
             {sug.cta && <Sg title="Better CTA">{sug.cta}</Sg>}
             {sug.colorPalette && sug.colorPalette.length > 0 && (
-              <Sg title="Suggested palette">
-                <div className="flex gap-1.5">
-                  {sug.colorPalette.map((c, i) => <span key={i} className="h-7 w-7 rounded-md border border-gray-200" style={{ backgroundColor: c }} />)}
-                </div>
-              </Sg>
+              <div className="print:hidden">
+                <Sg title="Suggested palette">
+                  <div className="flex gap-1.5">
+                    {sug.colorPalette.map((c, i) => <span key={i} className="h-7 w-7 rounded-md border border-gray-200" style={{ backgroundColor: c }} />)}
+                  </div>
+                </Sg>
+              </div>
             )}
             {list(sug.trustElements, "Trust elements")}
             {list(sug.missingSections, "Missing sections")}

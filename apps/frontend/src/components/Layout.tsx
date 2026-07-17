@@ -21,8 +21,10 @@ import {
   Wrench,
 } from "lucide-react";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth.store";
 import { OWNER_EMAIL } from "@/pages/Settings";
+import { api } from "@/lib/api-client";
 import clsx from "clsx";
 
 const ADMIN = ["ADMIN", "SUPER_ADMIN"];
@@ -30,7 +32,7 @@ const ADMIN = ["ADMIN", "SUPER_ADMIN"];
 // Kept flat at the top so the booth sidebar stays simple.
 const primaryItems = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/leads", label: "Leads", icon: Users },
+  { to: "/leads", label: "Data", icon: Users },
   { to: "/scan", label: "Capture Lead", icon: ScanLine },
   { to: "/scan?manual=1", label: "Manual Form", icon: PencilLine },
   { to: "/ai/score", label: "AI Score Game", icon: Gamepad2, roles: ADMIN },
@@ -98,6 +100,14 @@ export function Layout() {
   const tools = toolItems.filter(visible);
   const [toolsOpen, setToolsOpen] = useState(() => tools.some((t) => location.pathname.startsWith(t.to)));
 
+  // Title the app after the active event (e.g. "MMD 2026").
+  const { data: eventsData } = useQuery({
+    queryKey: ["layout-active-event"],
+    queryFn: async () => (await api.events.list({ take: 100 })).data,
+  });
+  const eventList: { name: string; status?: string }[] = eventsData?.events ?? [];
+  const eventName = (eventList.find((e) => e.status === "ACTIVE") ?? eventList[0])?.name || "Lead Capture";
+
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
       {/* Mobile overlay */}
@@ -116,10 +126,10 @@ export function Layout() {
         )}
       >
         <div className="flex h-16 items-center gap-2 border-b border-gray-200 px-6">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white">
-            E
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-600 text-sm font-bold text-white">
+            {eventName.charAt(0).toUpperCase()}
           </div>
-          <span className="text-lg font-bold text-gray-900">ELC</span>
+          <span className="truncate text-lg font-bold text-gray-900" title={eventName}>{eventName}</span>
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
@@ -175,7 +185,7 @@ export function Layout() {
           >
             {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
-          <h1 className="text-lg font-semibold text-gray-900">Exhibition Lead Capture</h1>
+          <h1 className="truncate text-lg font-semibold text-gray-900">{eventName}</h1>
         </header>
 
         {/* Page content */}

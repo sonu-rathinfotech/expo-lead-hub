@@ -234,7 +234,7 @@ export function LeadsPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Leads</h2>
+          <h2 className="text-2xl font-bold text-gray-900">Data</h2>
           <p className="mt-1 text-sm text-gray-500">{total} total</p>
         </div>
         <button

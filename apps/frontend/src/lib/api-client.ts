@@ -236,6 +236,7 @@ export const api = {
     sendReport: (id: string) => getApiClient().post(`/leads/${id}/send-report`),
     bookMeeting: (id: string, data: { date: string; time: string; note?: string }) =>
       getApiClient().post(`/leads/${id}/meeting`, data),
+    syncSheet: () => getApiClient().post(`/leads/sync-sheet`),
   },
 
   // Audit Logs

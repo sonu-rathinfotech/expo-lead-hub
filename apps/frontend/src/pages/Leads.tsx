@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Download, Search, Loader2, Trash2, Gamepad2, Mail, Copy, CalendarClock, CheckCircle2, FileText, RefreshCw } from "lucide-react";
+import { Download, Search, Loader2, Trash2, Gamepad2, Mail, Copy, CalendarClock, CheckCircle2, FileText, RefreshCw, Sheet } from "lucide-react";
 import toast from "react-hot-toast";
 import { api } from "../lib/api-client";
 import { appUrl } from "../lib/app-url";
@@ -94,6 +94,15 @@ export function LeadsPage() {
       qc.invalidateQueries({ queryKey: ["leads"] });
     },
     onError: (e: any) => toast.error(e?.response?.data?.message ?? "Couldn't send report"),
+  });
+
+  const syncSheet = useMutation({
+    mutationFn: () => api.leads.syncSheet(),
+    onSuccess: (res: any) => {
+      toast.success(res?.data?.message ?? "Synced to sheet");
+      qc.invalidateQueries({ queryKey: ["leads"] });
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message ?? "Sheet sync failed"),
   });
 
   const resetPageAnd = (fn: () => void) => {
@@ -259,6 +268,14 @@ export function LeadsPage() {
             className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
           >
             <RefreshCw size={16} className={isFetching ? "animate-spin" : ""} /> Refresh
+          </button>
+          <button
+            onClick={() => syncSheet.mutate()}
+            disabled={syncSheet.isPending}
+            title="Push all not-yet-synced leads to the Google Sheet"
+            className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
+          >
+            {syncSheet.isPending ? <Loader2 size={16} className="animate-spin" /> : <Sheet size={16} />} Sync to Sheet
           </button>
           <button
             onClick={handleExport}

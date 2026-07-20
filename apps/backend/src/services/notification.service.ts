@@ -2,6 +2,7 @@ import { prisma } from "@elc/db";
 import { setting } from "./settings.service";
 import { whatsAppService } from "./whatsapp.service";
 import { emailService } from "./email.service";
+import { syncLeadToSheet } from "./sheets.service";
 import { playLink } from "../utils/play-link";
 
 // ── Field extraction (tolerant of camelCase / snake_case form keys) ──
@@ -67,6 +68,9 @@ export async function notifyLeadReceived(leadId: string): Promise<void> {
     include: { event: { select: { id: true, name: true } } },
   });
   if (!lead) return;
+
+  // Push the lead to the Google Sheet (best-effort, independent of email/WA).
+  void syncLeadToSheet(lead.id).catch(() => {});
 
   const configs = await prisma.notificationConfig.findMany({
     where: { eventId: lead.eventId, isActive: true },

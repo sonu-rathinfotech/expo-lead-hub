@@ -100,6 +100,12 @@ export const SETTINGS: SettingDef[] = [
   { key: "OPENWA_API_KEY", label: "OpenWA API key", group: "WhatsApp (OpenWA)", secret: true },
   { key: "OPENWA_SESSION_ID", label: "OpenWA session id", group: "WhatsApp (OpenWA)" },
   {
+    key: "SHEETS_WEBHOOK_URL",
+    label: "Google Sheet webhook URL (Apps Script /exec)",
+    group: "Google Sheets",
+    hint: "Deploy an Apps Script Web App on your sheet and paste its /exec URL. Every captured lead is appended as a row.",
+  },
+  {
     key: "AI_VOICE_PROVIDER",
     label: "Audit narration voice",
     group: "Voice (audit narration)",

@@ -7,6 +7,7 @@ import { AppError } from "../middleware/error-handler";
 import { asyncHandler } from "../utils/async-handler";
 import { sendReportsForLead } from "../services/report-email.service";
 import { bookMeeting } from "../services/meeting.service";
+import { syncUnsyncedLeads, sheetsEnabled } from "../services/sheets.service";
 
 const router = Router();
 router.use(authenticate);
@@ -271,6 +272,17 @@ router.post(
     const { sent, email, sentCount, reason } = await sendReportsForLead(id);
     if (sent === 0) throw new AppError(400, reason ?? "Nothing to send");
     res.json({ sent, email, sentCount, message: `Report sent to ${email}` });
+  }),
+);
+
+// ── POST /api/leads/sync-sheet (push all not-yet-synced leads to the sheet) ──
+router.post(
+  "/sync-sheet",
+  requireRole("SUPER_ADMIN", "ADMIN"),
+  asyncHandler(async (_req: Request, res: Response) => {
+    if (!sheetsEnabled()) throw new AppError(400, "No Google Sheet webhook configured (Settings → Google Sheets).");
+    const r = await syncUnsyncedLeads();
+    res.json({ ...r, message: `${r.synced} synced to the sheet${r.failed ? `, ${r.failed} failed` : ""}` });
   }),
 );
 

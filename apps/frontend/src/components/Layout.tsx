@@ -9,6 +9,7 @@ import {
   ScrollText,
   UserCog,
   Workflow,
+  CalendarDays,
   Sparkles,
   MonitorPlay,
   Gamepad2,
@@ -40,6 +41,7 @@ const primaryItems = [
 
 // Admin-only tools, tucked behind a collapsible "Admin Tools" group.
 const toolItems = [
+  { to: "/events", label: "Events", icon: CalendarDays, roles: ADMIN },
   { to: "/ai/score", label: "AI Score Game", icon: Gamepad2, roles: ADMIN },
   { to: "/ai/history", label: "Analysis History", icon: Sparkles, roles: ADMIN },
   { to: "/qr-codes", label: "QR Codes", icon: QrCode, roles: ADMIN },

@@ -9,8 +9,19 @@ import { visitorTypeRouter } from "./visitor-types.routes";
 import { formDefinitionRouter } from "./forms.routes";
 import { crmConfigRouter } from "./crm-config.routes";
 import { sheetsConfigRouter } from "./sheets-config.routes";
+import { provisionEvent, activateEvent } from "../services/event-provision.service";
 
 const router = Router();
+
+// Quick-create: name (+ optional venue/dates) → a fully-usable event with a
+// default booth, visitor type and form. Optionally make it the active event.
+const quickEventSchema = z.object({
+  name: z.string().min(1, "Event name is required"),
+  venue: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  activate: z.boolean().default(true),
+});
 
 // ── Validation Schemas ────────────────────
 const createEventSchema = z.object({
@@ -31,6 +42,34 @@ const updateEventSchema = createEventSchema.partial();
 
 // All event routes require authentication
 router.use(authenticate);
+
+// ── POST /api/events/quick (Admin — create a ready-to-use event) ──
+router.post(
+  "/quick",
+  requireRole("SUPER_ADMIN", "ADMIN"),
+  asyncHandler(async (req: Request, res: Response) => {
+    const p = quickEventSchema.parse(req.body);
+    const event = await provisionEvent({
+      name: p.name,
+      venue: p.venue || p.name,
+      startDate: p.startDate ? new Date(p.startDate) : undefined,
+      endDate: p.endDate ? new Date(p.endDate) : undefined,
+      createdBy: req.user!.id,
+      activate: p.activate,
+    });
+    res.status(201).json({ event, message: `Event "${event.name}" created${p.activate ? " and set active" : ""}.` });
+  }),
+);
+
+// ── PATCH /api/events/:id/activate (Admin — make this the active event) ──
+router.patch(
+  "/:id/activate",
+  requireRole("SUPER_ADMIN", "ADMIN"),
+  asyncHandler(async (req: Request, res: Response) => {
+    await activateEvent(String(req.params.id));
+    res.json({ message: "Event activated" });
+  }),
+);
 
 // ── GET /api/events (List all events) ─────
 router.get(
@@ -60,6 +99,7 @@ router.get(
           creator: { select: { id: true, name: true, email: true } },
           booths: { select: { id: true } },
           visitorTypes: { select: { id: true } },
+          _count: { select: { leads: true } },
         },
         orderBy: { createdAt: "desc" },
         skip: typeof skip === "string" ? parseInt(skip) : 0,
@@ -73,6 +113,7 @@ router.get(
         ...e,
         boothCount: e.booths.length,
         visitorTypeCount: e.visitorTypes.length,
+        leadCount: e._count.leads,
       })),
       total,
       page: typeof skip === "string" ? Math.floor(parseInt(skip) / (typeof take === "string" ? parseInt(take) : 20)) : 0,

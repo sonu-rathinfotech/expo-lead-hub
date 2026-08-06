@@ -69,6 +69,10 @@ export async function notifyLeadReceived(leadId: string): Promise<void> {
   });
   if (!lead) return;
 
+  // Capture-only mode: lead is already saved — skip welcome email, sheet sync
+  // and WhatsApp entirely. (Toggle in Settings → Booth.)
+  if ((setting("LEAD_NOTIFICATIONS") || "on") === "off") return;
+
   // Push the lead to the Google Sheet (best-effort, independent of email/WA).
   void syncLeadToSheet(lead.id).catch(() => {});
 

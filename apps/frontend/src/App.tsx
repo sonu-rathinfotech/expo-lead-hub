@@ -13,6 +13,7 @@ import { SyncPage } from "./pages/Sync";
 import { AuditLogPage } from "./pages/AuditLog";
 import { UsersPage } from "./pages/Users";
 import { AutomationPage } from "./pages/Automation";
+import { EventsPage } from "./pages/Events";
 import { AccountPage } from "./pages/Account";
 import { SettingsPage, OWNER_EMAIL } from "./pages/Settings";
 import { PublicLeadForm } from "./pages/PublicLeadForm";
@@ -86,6 +87,7 @@ export default function App() {
           <Route path="sync" element={<RequireRole roles={ADMIN}><SyncPage /></RequireRole>} />
           <Route path="audit" element={<RequireRole roles={ADMIN}><AuditLogPage /></RequireRole>} />
           <Route path="automation" element={<RequireRole roles={ADMIN}><AutomationPage /></RequireRole>} />
+          <Route path="events" element={<RequireRole roles={ADMIN}><EventsPage /></RequireRole>} />
           <Route path="partnership-calc" element={<RequireRole roles={ADMIN}><PartnershipCalculator /></RequireRole>} />
           <Route path="users" element={<RequireRole roles={["SUPER_ADMIN"]}><UsersPage /></RequireRole>} />
         </Route>

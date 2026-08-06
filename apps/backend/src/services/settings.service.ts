@@ -68,6 +68,7 @@ const DEFAULTS: Record<string, string> = {
   AI_VOICE_PROVIDER: "browser",
   GEMINI_TTS_VOICE: "Kore",
   DATAFORSEO_AI_MENTIONS: "on",
+  LEAD_NOTIFICATIONS: "on",
 };
 
 // The integration credentials that can be managed from the portal.
@@ -104,6 +105,14 @@ export const SETTINGS: SettingDef[] = [
     label: "Google Sheet webhook URL (Apps Script /exec)",
     group: "Google Sheets",
     hint: "Deploy an Apps Script Web App on your sheet and paste its /exec URL. Every captured lead is appended as a row.",
+  },
+  {
+    key: "LEAD_NOTIFICATIONS",
+    label: "On capture: welcome email + sheet sync + WhatsApp",
+    group: "Booth",
+    type: "select",
+    options: ["on", "off"],
+    hint: "‘off’ = capture only (lead saves to the DB, nothing else runs). The manual ‘Sync to Sheet’ button still works.",
   },
   {
     key: "AI_VOICE_PROVIDER",

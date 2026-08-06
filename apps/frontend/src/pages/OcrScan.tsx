@@ -115,7 +115,8 @@ export function OcrScanPage() {
     queryKey: ["events-filter"],
     queryFn: async () => (await api.events.list({ take: 100 })).data,
   });
-  const events: { id: string; name: string }[] = eventsData?.events ?? [];
+  const events: { id: string; name: string; status?: string }[] = eventsData?.events ?? [];
+  const activeEvent = events.find((e) => e.status === "ACTIVE") ?? events[0];
 
   const { data: eventDetail } = useQuery({
     queryKey: ["event-detail", eventId],
@@ -137,10 +138,11 @@ export function OcrScanPage() {
     (f: any) => f.isActive !== false,
   );
 
-  // Auto-select the only/first option so staff don't pick every time.
+  // Default to the ACTIVE event; booth + visitor type auto-select below. The
+  // pickers are hidden — staff just capture cards for the active event.
   useEffect(() => {
-    if (!eventId && events.length) setEventId(events[0]!.id);
-  }, [events, eventId]);
+    if (!eventId && activeEvent) setEventId(activeEvent.id);
+  }, [activeEvent, eventId]);
   useEffect(() => {
     if (eventId && !boothId && booths.length) setBoothId(booths[0].id);
   }, [eventId, booths, boothId]);
@@ -392,24 +394,21 @@ export function OcrScanPage() {
       <div>
         <h2 className="text-2xl font-bold text-gray-900">{startManual ? "Manual Entry" : "Capture Lead"}</h2>
         <p className="mt-1 text-sm text-gray-500">
+          {activeEvent?.name ? (
+            <>
+              <span className="font-medium text-indigo-600">{activeEvent.name}</span> ·{" "}
+            </>
+          ) : null}
           {startManual
             ? "Fill in the visitor's details, then save the lead."
             : "Scan a business card to auto-fill, or enter the details manually — then save the lead."}
         </p>
       </div>
 
-      {/* Context selectors */}
-      <div className="grid grid-cols-1 gap-4 rounded-lg border border-gray-200 bg-white p-5 sm:grid-cols-3">
-        <Select label="Event" value={eventId} onChange={(v) => { setEventId(v); setBoothId(""); setVisitorTypeId(""); }}
-          options={events.map((e) => ({ value: e.id, label: e.name }))} placeholder="Select event…" />
-        <Select label="Booth" value={boothId} onChange={setBoothId} disabled={!eventId}
-          options={booths.map((b: any) => ({ value: b.id, label: b.name }))} placeholder="Select booth…" />
-        <Select label="Visitor type" value={visitorTypeId} onChange={setVisitorTypeId} disabled={!eventId}
-          options={visitorTypes.map((v: any) => ({ value: v.id, label: v.name }))} placeholder="Select type…" />
-      </div>
-
       {!ready ? (
-        <p className="text-sm text-gray-400">Select an event, booth, and visitor type to begin.</p>
+        <p className="text-sm text-gray-400">
+          {events.length === 0 ? "No active event. Create one in Events." : "Setting up the active event…"}
+        </p>
       ) : startManual ? (
         // Manual Form — BNI search + just the form, no card-scan UI.
         <div className="mx-auto max-w-2xl space-y-4">
@@ -504,30 +503,3 @@ export function OcrScanPage() {
   );
 }
 
-function Select({
-  label, value, onChange, options, placeholder, disabled,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-  placeholder: string;
-  disabled?: boolean;
-}) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
-      <select
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:bg-gray-50"
-      >
-        <option value="">{placeholder}</option>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
-      </select>
-    </div>
-  );
-}

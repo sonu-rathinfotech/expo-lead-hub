@@ -115,6 +115,9 @@ export const api = {
     list: (params?: any) => getApiClient().get("/events", { params }),
     get: (id: string) => getApiClient().get(`/events/${id}`),
     create: (data: any) => getApiClient().post("/events", data),
+    quickCreate: (data: { name: string; venue?: string; startDate?: string; endDate?: string; activate?: boolean }) =>
+      getApiClient().post("/events/quick", data),
+    activate: (id: string) => getApiClient().patch(`/events/${id}/activate`),
     update: (id: string, data: any) => getApiClient().put(`/events/${id}`, data),
     delete: (id: string) => getApiClient().delete(`/events/${id}`),
   },

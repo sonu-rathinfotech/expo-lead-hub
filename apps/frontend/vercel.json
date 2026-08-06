@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "VITE_BASE_PATH=/ pnpm build",
   "rewrites": [
     {
       "source": "/api/:path*",

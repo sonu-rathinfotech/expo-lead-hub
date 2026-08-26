@@ -43,9 +43,13 @@ const reorderFieldsSchema = z.object({
   fieldIds: z.array(z.string().uuid("Invalid field ID")),
 });
 
-// All form field routes require authentication and ADMIN+ role
+// Auth on every field route. GET is allowed for STAFF (used by /scan);
+// mutations stay ADMIN+.
 router.use(authenticate);
-router.use(requireRole("SUPER_ADMIN", "ADMIN"));
+router.use((req, res, next) => {
+  if (req.method === "GET") return next();
+  return requireRole("SUPER_ADMIN", "ADMIN")(req, res, next);
+});
 
 // ── GET /api/events/:eventId/forms/:formId/fields ──────
 router.get(

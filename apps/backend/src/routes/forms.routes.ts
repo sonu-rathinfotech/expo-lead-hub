@@ -15,9 +15,13 @@ const createFormDefinitionSchema = z.object({
 
 const updateFormDefinitionSchema = createFormDefinitionSchema.partial();
 
-// All form routes require authentication and ADMIN+ role
+// Auth on every form route. Staff must be able to GET fields (Capture Lead);
+// creating/editing forms stays ADMIN+.
 router.use(authenticate);
-router.use(requireRole("SUPER_ADMIN", "ADMIN"));
+router.use((req, res, next) => {
+  if (req.method === "GET") return next();
+  return requireRole("SUPER_ADMIN", "ADMIN")(req, res, next);
+});
 
 // ── GET /api/events/:eventId/forms ──────
 router.get(

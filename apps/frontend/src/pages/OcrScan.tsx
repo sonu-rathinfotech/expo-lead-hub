@@ -111,30 +111,16 @@ export function OcrScanPage() {
   const [bniResults, setBniResults] = useState<any[]>([]);
   const [bniNonce, setBniNonce] = useState(0);
 
-  const { data: eventsData } = useQuery({
-    queryKey: ["events-filter"],
-    queryFn: async () => (await api.events.list({ take: 100 })).data,
+  const { data: setup, error: setupError, isLoading: setupLoading } = useQuery({
+    queryKey: ["ocr-setup"],
+    queryFn: async () => (await api.ocr.setup()).data,
   });
-  const events: { id: string; name: string; status?: string }[] = eventsData?.events ?? [];
+  const events: { id: string; name: string; status?: string }[] = setup?.events ?? [];
   const activeEvent = events.find((e) => e.status === "ACTIVE") ?? events[0];
-
-  const { data: eventDetail } = useQuery({
-    queryKey: ["event-detail", eventId],
-    queryFn: async () => (await api.events.get(eventId)).data,
-    enabled: !!eventId,
-  });
-  const booths = eventDetail?.event?.booths ?? [];
-  const visitorTypes = eventDetail?.event?.visitorTypes ?? [];
-  const form = eventDetail?.event?.formDefinitions?.[0];
-
-  // The event-detail endpoint returns the form definition but not its fields,
-  // so fetch them separately (same source the Form Builder uses).
-  const { data: fieldsData } = useQuery({
-    queryKey: ["ocr-form-fields", eventId, form?.id],
-    queryFn: async () => (await api.formFields.list(eventId, form!.id)).data,
-    enabled: !!eventId && !!form?.id,
-  });
-  const activeFields: FormFieldDef[] = (fieldsData?.fields ?? []).filter(
+  const booths = setup?.booths ?? setup?.event?.booths ?? [];
+  const visitorTypes = setup?.visitorTypes ?? setup?.event?.visitorTypes ?? [];
+  const form = setup?.form ?? setup?.event?.formDefinitions?.[0];
+  const activeFields: FormFieldDef[] = (setup?.fields ?? form?.fields ?? []).filter(
     (f: any) => f.isActive !== false,
   );
 
@@ -196,7 +182,7 @@ export function OcrScanPage() {
         eventId,
         boothId,
         visitorTypeId,
-        formDefinitionId: form!.id,
+        formDefinitionId: form?.id,
         ocrRawText: scan?.rawText ?? "",
         ocrConfidence: scan?.confidence ?? 0,
         formData,
@@ -405,9 +391,19 @@ export function OcrScanPage() {
         </p>
       </div>
 
-      {!ready ? (
+      {setupError ? (
+        <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {(setupError as any)?.response?.data?.message ?? "Could not load the capture form. Refresh and try again."}
+        </p>
+      ) : !ready ? (
         <p className="text-sm text-gray-400">
-          {events.length === 0 ? "No active event. Create one in Events." : "Setting up the active event…"}
+          {setupLoading
+            ? "Setting up the active event…"
+            : events.length === 0
+              ? "No active event. Create one in Events."
+              : booths.length === 0 || visitorTypes.length === 0
+                ? "This event needs a booth and a visitor type before you can capture leads."
+                : "Setting up the active event…"}
         </p>
       ) : startManual ? (
         // Manual Form — BNI search + just the form, no card-scan UI.

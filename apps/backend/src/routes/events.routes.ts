@@ -13,6 +13,9 @@ import { provisionEvent, activateEvent } from "../services/event-provision.servi
 
 const router = Router();
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const EVENT_STATUSES = ["DRAFT", "ACTIVE", "COMPLETED", "CANCELLED"] as const;
+
 // Quick-create: name (+ optional venue/dates) → a fully-usable event with a
 // default booth, visitor type and form. Optionally make it the active event.
 const quickEventSchema = z.object({
@@ -77,7 +80,11 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const { status, skip = 0, take = 20 } = req.query;
 
-    const where = status ? { status: status as string } : {};
+    const statusStr = Array.isArray(status) ? status[0] : status;
+    const where =
+      typeof statusStr === "string" && EVENT_STATUSES.includes(statusStr as (typeof EVENT_STATUSES)[number])
+        ? { status: statusStr as (typeof EVENT_STATUSES)[number] }
+        : {};
 
     const [events, total] = await Promise.all([
       prisma.event.findMany({
@@ -126,33 +133,53 @@ router.get(
   "/:id",
   asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
+    if (!id || !UUID_RE.test(id)) {
+      throw new AppError(400, "Invalid event ID");
+    }
 
-    const event = await prisma.event.findUnique({
-      where: { id },
-      include: {
-        creator: { select: { id: true, name: true, email: true } },
-        booths: true,
-        visitorTypes: { orderBy: { displayOrder: "asc" } },
-        formDefinitions: true,
-        crmConfigurations: {
-          select: {
-            id: true,
-            apiUrl: true,
-            method: true,
-            isActive: true,
-            authType: true,
-          },
-        },
-        sheetsConfig: {
-          select: {
-            id: true,
-            spreadsheetId: true,
-            worksheetName: true,
-            isActive: true,
+    const coreInclude = {
+      creator: { select: { id: true, name: true, email: true } },
+      booths: true,
+      visitorTypes: { orderBy: { displayOrder: "asc" as const } },
+      formDefinitions: {
+        include: {
+          fields: {
+            where: { isActive: true },
+            orderBy: { displayOrder: "asc" as const },
+            include: { options: { orderBy: { displayOrder: "asc" as const } } },
           },
         },
       },
-    });
+    };
+
+    const optionalInclude = {
+      ...coreInclude,
+      crmConfigurations: {
+        select: {
+          id: true,
+          apiUrl: true,
+          method: true,
+          isActive: true,
+          authType: true,
+        },
+      },
+      sheetsConfig: {
+        select: {
+          id: true,
+          spreadsheetId: true,
+          worksheetName: true,
+          isActive: true,
+        },
+      },
+    };
+
+    let event;
+    try {
+      event = await prisma.event.findUnique({ where: { id }, include: optionalInclude });
+    } catch (err) {
+      console.error("event get with CRM/Sheets include failed, retrying without:", err);
+      event = await prisma.event.findUnique({ where: { id }, include: coreInclude });
+    }
 
     if (!event) {
       throw new AppError(404, "Event not found");

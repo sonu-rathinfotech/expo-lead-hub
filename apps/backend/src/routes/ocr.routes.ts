@@ -44,6 +44,73 @@ const submitOcrLeadSchema = z.object({
 router.use(authenticate);
 router.use(requireRole("SUPER_ADMIN", "ADMIN", "STAFF"));
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// ── GET /api/ocr/setup (Booth capture context — no CRM/Sheets includes) ──
+// /scan used to chain GET /events + GET /events/:id (which pulls CRM + Sheets
+// config) + GET form fields (ADMIN-only). Any of those 500ing blanked the page.
+router.get(
+  "/setup",
+  asyncHandler(async (_req: Request, res: Response) => {
+    let events: { id: string; name: string; status: string }[] = [];
+    try {
+      events = await prisma.event.findMany({
+        select: { id: true, name: true, status: true },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      });
+    } catch (err) {
+      console.error("ocr setup: event list failed", err);
+      throw new AppError(500, "Could not load events. Try again in a moment.");
+    }
+
+    const active = events.find((e) => e.status === "ACTIVE") ?? events[0] ?? null;
+    if (!active) {
+      return res.json({ events, event: null, booths: [], visitorTypes: [], form: null, fields: [] });
+    }
+
+    try {
+      const event = await prisma.event.findUnique({
+        where: { id: active.id },
+        include: {
+          booths: true,
+          visitorTypes: { orderBy: { displayOrder: "asc" } },
+          formDefinitions: {
+            where: { isActive: true },
+            take: 1,
+            include: {
+              fields: {
+                where: { isActive: true },
+                orderBy: { displayOrder: "asc" },
+                include: { options: { orderBy: { displayOrder: "asc" } } },
+              },
+            },
+          },
+        },
+      });
+      const form = event?.formDefinitions?.[0] ?? null;
+      return res.json({
+        events,
+        event,
+        booths: event?.booths ?? [],
+        visitorTypes: event?.visitorTypes ?? [],
+        form,
+        fields: form?.fields ?? [],
+      });
+    } catch (err) {
+      console.error("ocr setup: event detail failed", err);
+      return res.json({
+        events,
+        event: active,
+        booths: [],
+        visitorTypes: [],
+        form: null,
+        fields: [],
+      });
+    }
+  }),
+);
+
 // ── POST /api/ocr/smart-scan (Gemini vision — reliable card reading) ──
 const smartScanSchema = z.object({ image: z.string().min(20, "Image is required") });
 router.post(
@@ -87,6 +154,9 @@ router.post(
     const payload = submitOcrLeadSchema.parse(req.body);
     const { eventId, boothId, visitorTypeId, formDefinitionId, ocrRawText, ocrConfidence, formData, submittedBy, source } =
       payload;
+    if (![eventId, boothId, visitorTypeId, formDefinitionId, submittedBy].every((id) => UUID_RE.test(id))) {
+      throw new AppError(400, "Invalid capture IDs — pick the active event and try again.");
+    }
 
     // Verify form exists and belongs to event
     const form = await prisma.formDefinition.findFirst({
